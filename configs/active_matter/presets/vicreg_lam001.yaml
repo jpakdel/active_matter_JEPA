@@ -1,0 +1,6 @@
+# VICReg sweep — 10× weaker outer scale.
+loss:
+  reg_type: "vicreg"
+  lambda_sigreg: 0.01
+  vicreg_var_weight: 25.0
+  vicreg_cov_weight: 1.0

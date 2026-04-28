@@ -1,0 +1,5 @@
+# SIGReg sweep — 10× stronger than default. Mirror of sigreg_lam001 in the
+# opposite direction.
+loss:
+  reg_type: "sigreg"
+  lambda_sigreg: 1.0

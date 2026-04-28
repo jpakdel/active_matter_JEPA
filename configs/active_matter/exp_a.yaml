@@ -1,0 +1,8 @@
+# Routing: Experiment A. Encoder sees the orientation tensor D (4 channels);
+# predictor must reconstruct the velocity field u (2 channels). DualPatchEncoder
+# is selected because the channel specs differ.
+experiment: "exp_a"
+run_name: "exp_a_v0"
+data:
+  context_channels: "D"
+  target_channels: "u"

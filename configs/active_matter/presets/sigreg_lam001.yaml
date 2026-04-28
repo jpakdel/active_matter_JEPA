@@ -1,0 +1,5 @@
+# SIGReg sweep — 10× weaker than default. Probes whether the default Exp B
+# α failure was an over-regularization artifact (it wasn't — see project_plan §6.2).
+loss:
+  reg_type: "sigreg"
+  lambda_sigreg: 0.01

@@ -1,0 +1,7 @@
+# Default VICReg preset. λ=0.1 (outer scale), var_weight=25, cov_weight=1
+# — the original VICReg paper's defaults.
+loss:
+  reg_type: "vicreg"
+  lambda_sigreg: 0.1
+  vicreg_var_weight: 25.0
+  vicreg_cov_weight: 1.0

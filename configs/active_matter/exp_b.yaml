@@ -1,0 +1,9 @@
+# Routing: Experiment B. Encoder sees ∇·D (2 channels); predictor must
+# reconstruct Δu (2 channels). The Stokes relation Δu ≈ -α·∇·D makes this
+# approximately local-linear. DualPatchEncoder is selected even though both
+# branches are 2-channel — the spec strings differ.
+experiment: "exp_b"
+run_name: "exp_b_v0"
+data:
+  context_channels: "divD"
+  target_channels: "lapU"

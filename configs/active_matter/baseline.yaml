@@ -1,0 +1,7 @@
+# Routing: baseline. All 11 channels in both branches; split is purely
+# temporal — context is one 16-frame block, target is the next.
+experiment: "baseline"
+run_name: "baseline_v0"
+data:
+  context_channels: "all"
+  target_channels: "all"

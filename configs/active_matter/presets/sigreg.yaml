@@ -1,0 +1,4 @@
+# Default SIGReg preset. λ=0.1, K = embed_dim slices.
+loss:
+  reg_type: "sigreg"
+  lambda_sigreg: 0.1

@@ -1,9 +1,9 @@
-"""D-JEPA training launcher (refactored).
+"""D-JEPA training launcher (refactored, 4-axis layered configs).
 
 Usage:
-    python scripts/train.py --routing baseline --reg sigreg
-    python scripts/train.py --routing exp_a    --reg vicreg
-    python scripts/train.py --routing exp_b    --reg vicreg_lam001 \\
+    python scripts/train.py --routing baseline --backbone vit --target shared --loss sigreg
+    python scripts/train.py --routing exp_a --backbone vit --target ema --loss vicreg
+    python scripts/train.py --routing exp_b --backbone cnn --target ema --loss vicreg_no_cov \\
                             --override optim.batch_size=4
 
 Creates a per-run directory:
@@ -45,10 +45,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--routing", required=True,
                     choices=("baseline", "exp_a", "exp_b"),
-                    help="experiment routing (which channel groups feed ctx and tgt)")
-    ap.add_argument("--reg", required=True,
-                    help="regularizer preset name; one of the files under "
-                         "configs/active_matter/presets/ (without the .yaml)")
+                    help="data-routing axis (which channel groups feed ctx and tgt)")
+    ap.add_argument("--backbone", default="vit",
+                    help="backbone preset name; file stem under "
+                         "configs/active_matter/backbones/")
+    ap.add_argument("--target", default="shared",
+                    help="target-encoder preset name; file stem under "
+                         "configs/active_matter/targets/ (shared | ema)")
+    ap.add_argument("--loss", required=True,
+                    help="loss / regularizer preset name; file stem under "
+                         "configs/active_matter/losses/")
     ap.add_argument("--override", action="append", default=[],
                     metavar="KEY=VALUE",
                     help="dotted-key override on the merged config; "
@@ -62,11 +68,15 @@ def main():
 
     cfg = load_layered_config(
         routing=args.routing,
-        reg=args.reg,
+        backbone=args.backbone,
+        target=args.target,
+        loss=args.loss,
         overrides=_parse_overrides(args.override),
     )
 
-    base_name = args.run_name or f"{cfg.get('experiment')}_{args.reg}"
+    base_name = args.run_name or (
+        f"{cfg.get('experiment')}_{args.backbone}_{args.target}_{args.loss}"
+    )
     stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     run_id = f"{base_name}_{stamp}"
 
@@ -75,18 +85,18 @@ def main():
     manifest_path = out_root / "manifest.tsv"
 
     print(f"routing:     {args.routing}")
-    print(f"reg preset:  {args.reg}")
+    print(f"backbone:    {args.backbone}")
+    print(f"target:      {args.target}")
+    print(f"loss:        {args.loss}")
     print(f"run_id:      {run_id}")
     print(f"run_dir:     {run_dir}")
     print(f"manifest:    {manifest_path}")
     print(f"experiment:  {cfg.get('experiment')}")
-    print(f"encoder:     {cfg['model']['encoder_size']}")
     print(f"batch_size:  {cfg['optim']['batch_size']}")
     print(f"num_workers: {cfg['optim']['num_workers']}")
     print(f"num_epochs:  {cfg['optim']['num_epochs']} (override: {args.max_epochs})")
     print(f"reg_type:    {cfg['loss']['reg_type']}")
-    print(f"lambda:      {cfg['loss']['lambda_sigreg']}")
-    print(f"lr:          {cfg['optim']['lr']}")
+    print(f"target_type: {cfg['train']['target_type']}")
 
     summary = train(
         cfg,

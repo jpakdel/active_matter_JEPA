@@ -74,6 +74,7 @@ def save_checkpoint(
     epoch: int,
     config: dict,
     scaler: Optional[torch.cuda.amp.GradScaler] = None,
+    target_encoder: Optional[torch.nn.Module] = None,
     extra: Optional[dict] = None,
 ) -> Path:
     path = Path(path)
@@ -91,6 +92,7 @@ def save_checkpoint(
         "rng": _rng_state_dict(),
         "config": config,
         "scaler": scaler.state_dict() if scaler is not None else None,
+        "target_encoder": target_encoder.state_dict() if target_encoder is not None else None,
         "extra": extra or {},
     }
     torch.save(payload, tmp)
@@ -107,10 +109,17 @@ def load_checkpoint(
     lr_sched,
     wd_sched,
     scaler: Optional[torch.cuda.amp.GradScaler] = None,
+    target_encoder: Optional[torch.nn.Module] = None,
     map_location: str = "cpu",
     restore_rng: bool = True,
 ) -> dict:
-    """Load checkpoint in-place. Returns the payload dict for any extra fields."""
+    """Load checkpoint in-place. Returns the payload dict for any extra fields.
+
+    ``target_encoder``, when provided, is loaded from the checkpoint's
+    ``"target_encoder"`` slot. If the checkpoint was made *without* an EMA
+    target (older runs), the slot is ``None`` and we leave the target encoder
+    at whatever state the trainer initialized it to.
+    """
     payload = torch.load(str(path), map_location=map_location, weights_only=False)
     encoder.load_state_dict(payload["encoder"])
     predictor.load_state_dict(payload["predictor"])
@@ -119,6 +128,8 @@ def load_checkpoint(
     wd_sched._step = payload["wd_sched_step"]
     if scaler is not None and payload.get("scaler") is not None:
         scaler.load_state_dict(payload["scaler"])
+    if target_encoder is not None and payload.get("target_encoder") is not None:
+        target_encoder.load_state_dict(payload["target_encoder"])
     if restore_rng and "rng" in payload:
         _load_rng_state_dict(payload["rng"])
     return payload

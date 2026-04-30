@@ -51,12 +51,12 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.data.well_dataset import WellDatasetForJEPA
-from src.models.encoder import embed_dim_for
 from src.train.builders import (
+    _embed_dim_from_config,
     build_encoder_from_config,
-    channels_for as _channels_for,
-    encoder_forward as _encoder_forward,
-    select_channels as _select_channels,
+    channels_for,
+    encoder_forward,
+    select_channels,
 )
 
 
@@ -193,7 +193,7 @@ def extract_one_split(
         # level doesn't care about the target; what matters is "what does the
         # encoder do when handed a physical snapshot".
         ctx = batch["context"].to(device, non_blocking=True)
-        ctx = _select_channels(ctx, context_channels)
+        ctx = select_channels(ctx, context_channels)
         ctx_mgr = (torch.autocast(device_type="cuda", dtype=torch.float16)
                    if amp_on else contextlib.nullcontext())
         with ctx_mgr:
@@ -201,7 +201,7 @@ def extract_one_split(
             # a DualPatchEncoder; a plain VisionTransformer ignores the
             # branch arg. Eval always encodes the context branch — the
             # target patch embed is never used downstream.
-            z = _encoder_forward(encoder, ctx, branch="ctx")   # (B, N_tokens, D)
+            z = encoder_forward(encoder, ctx, branch="ctx")   # (B, N_tokens, D)
         pooled = pool_tokens(z.float(), pool)   # (B, D)
         feats.append(pooled.cpu())
         labs.append(batch["physical_params"].float().cpu())
@@ -247,7 +247,9 @@ def extract_all_splits(
     encoder = _build_encoder_from_config(cfg, device_t)
     ckpt_info = _load_encoder_state(encoder, ckpt_path, map_location=str(device_t))
 
-    D_enc = embed_dim_for(cfg["model"]["encoder_size"])
+    # Use the backbone-aware helper — `embed_dim_for(size)` is ViT-only and
+    # KeyError's on CNN configs where encoder_size="cnn".
+    D_enc = _embed_dim_from_config(cfg)
     written: dict[str, dict] = {}
     for split in splits:
         loader = _eval_loader(cfg, split, batch_size=batch_size, num_workers=num_workers,

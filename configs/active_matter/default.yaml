@@ -1,12 +1,11 @@
 # D-JEPA default config for active_matter.
 #
-# This file holds every knob the training and eval pipelines understand,
-# at sane default values. It is layered with one of the routing files
-# ({baseline, exp_a, exp_b}.yaml) and one of the regularizer presets in
-# presets/ — see src/config_loader.py for the merge logic.
+# This file holds non-axis defaults: data, optim, log. The other axes — model
+# (backbone), train (target type), and loss (regularizer) — come from preset
+# files in their own directories. See src/config_loader.py for the merge order.
 #
 # Run via:
-#   python scripts/train.py --routing exp_a --reg vicreg
+#   python scripts/train.py --routing exp_a --backbone vit --target ema --loss sigreg
 #   python scripts/eval.py  --run-dir runs/<run_id>
 
 # --- identification -----------------------------------------------------------
@@ -15,44 +14,27 @@ seed: 0
 
 # --- data ---------------------------------------------------------------------
 data:
-  data_dir: "data/active_matter"
+  # Relative to REFACTORED_CODEBASE/ (the cwd of scripts/train.py and
+  # scripts/eval.py). The actual data lives one directory up in the parent
+  # repo. If you move this folder elsewhere, update this path.
+  data_dir: "../data/active_matter"
   num_frames: 16
   stride: null            # null = stride == num_frames (non-overlapping windows)
   noise_std: 0.0
   # context_channels / target_channels filled in by the routing override.
 
 # --- model --------------------------------------------------------------------
-model:
-  encoder_size: "small"     # tiny | small | base | large
-  encoder:
-    img_size: 256
-    patch_size: 16
-    num_frames: 16
-    tubelet_size: 2
-    mlp_ratio: 4.0
-    drop_rate: 0.0
-    attn_drop_rate: 0.0
-    uniform_power: false
-  predictor:
-    predictor_embed_dim: 384
-    depth: 6
-    num_heads: 6
-    mlp_ratio: 4.0
+# Filled in by --backbone preset (configs/active_matter/backbones/*.yaml).
+
+# --- train --------------------------------------------------------------------
+# Filled in by --target preset (configs/active_matter/targets/*.yaml).
+# Defaults if no preset is selected:
+train:
+  target_type: "shared_stopgrad"
+  ema_decay: 0.996
 
 # --- loss ---------------------------------------------------------------------
-# Defaults to SIGReg at λ=0.1; presets/ overlays this block to switch
-# regularizer family or sweep a specific knob.
-loss:
-  reg_type: "sigreg"
-  lambda_sigreg: 0.1
-  sigreg_num_slices: null   # null -> defaults to encoder embed_dim
-  sigreg_t_max: 3.0
-  sigreg_n_points: 17
-  # VICReg defaults (only consulted when reg_type=="vicreg"):
-  vicreg_var_weight: 25.0
-  vicreg_cov_weight: 1.0
-  vicreg_gamma: 1.0
-  vicreg_eps: 1.0e-4
+# Filled in by --loss preset (configs/active_matter/losses/*.yaml).
 
 # --- optim --------------------------------------------------------------------
 optim:

@@ -55,7 +55,17 @@ def train_one_step(
     scaler: Optional[torch.cuda.amp.GradScaler],
     cfg: dict,
     device: torch.device,
+    target_encoder: Optional[torch.nn.Module] = None,
 ) -> tuple[DJepaLossOutput, dict]:
+    """One optimizer step.
+
+    If ``target_encoder`` is None, the original D-JEPA recipe is used: the
+    same ``encoder`` runs both branches, with no_grad on the target side.
+
+    If ``target_encoder`` is provided (EMA mode), the target branch runs
+    through ``target_encoder`` instead, also under no_grad. The EMA *update*
+    itself is the trainer's responsibility (one call after the optimizer step).
+    """
     ctx_spec = cfg["data"]["context_channels"]
     tgt_spec = cfg["data"]["target_channels"]
     use_amp = cfg["optim"]["use_amp"] and device.type == "cuda"
@@ -65,6 +75,11 @@ def train_one_step(
     tgt_full = batch["target"].to(device, non_blocking=True)
     ctx = select_channels(ctx_full, ctx_spec)
     tgt = select_channels(tgt_full, tgt_spec)
+
+    # Pick the module that produces z_tgt. EMA mode uses a separate frozen
+    # encoder; shared-stop-grad mode uses the same `encoder` as the context
+    # branch.
+    tgt_module = target_encoder if target_encoder is not None else encoder
 
     optimizer.zero_grad(set_to_none=True)
     t_fwd0 = now_ms()
@@ -76,7 +91,7 @@ def train_one_step(
     with amp_ctx:
         z_ctx = encoder_forward(encoder, ctx, branch="ctx")
         with torch.no_grad():
-            z_tgt = encoder_forward(encoder, tgt, branch="tgt").detach()
+            z_tgt = encoder_forward(tgt_module, tgt, branch="tgt").detach()
         z_hat = predictor(z_ctx)
         # Per project_plan §1: regularize the context-branch encoder output,
         # not the predictor output. This is what prevents encoder collapse.

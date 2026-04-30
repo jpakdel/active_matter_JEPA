@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from src.data.well_dataset import WellDatasetForJEPA
 from src.losses.djepa_loss import DJepaLoss
+from src.models.cnn_encoder import ConvEncoder, DualConvEncoder
 from src.models.dual_patch_encoder import DualPatchEncoder
 from src.models.encoder import build_encoder, embed_dim_for
 from src.models.simple_predictor import build_predictor
@@ -58,13 +59,18 @@ def select_channels(x: torch.Tensor, spec: str) -> torch.Tensor:
 def encoder_forward(
     encoder: torch.nn.Module, x: torch.Tensor, branch: str
 ) -> torch.Tensor:
-    """Dispatch to ``DualPatchEncoder(x, branch=...)`` or a plain encoder.
+    """Dispatch to ``Dual{Patch,Conv}Encoder(x, branch=...)`` or a plain encoder.
 
     Lets callers stay agnostic about whether the config wired up a single
-    ``VisionTransformer`` or a ``DualPatchEncoder`` — the branch arg is only
-    consulted by the latter.
+    encoder (VisionTransformer / ConvEncoder) or a dual encoder; only duals
+    consume the branch arg. Both ViT-side ``DualPatchEncoder`` and CNN-side
+    ``DualConvEncoder`` need the routing — failing to dispatch correctly on
+    DualConvEncoder silently routes target inputs through ctx_stem and
+    causes (a) a shape-mismatch crash when ctx_chans != tgt_chans, or (b) a
+    silent collapse to trivial-prediction when the channel counts happen to
+    match (e.g. exp_b with 2-ch divD and 2-ch lapU).
     """
-    if isinstance(encoder, DualPatchEncoder):
+    if isinstance(encoder, (DualPatchEncoder, DualConvEncoder)):
         return encoder(x, branch=branch)
     return encoder(x)
 
@@ -83,26 +89,47 @@ def channels_for(spec: str) -> int:
     return total
 
 
-# Back-compat aliases for older imports (with leading underscore).
-_select_channels = select_channels
-_encoder_forward = encoder_forward
-_channels_for = channels_for
-
-
 # ---- builders ----------------------------------------------------------------
 
 def build_encoder_from_config(cfg: dict, device: torch.device) -> torch.nn.Module:
-    """Build only the encoder (used by eval, which doesn't need predictor/loss)."""
+    """Build only the encoder (used by eval, which doesn't need predictor/loss).
+
+    Dispatches on ``cfg.model.backbone``:
+
+      - ``"vit"`` (default): ``VisionTransformer`` for matched-channel routings,
+        ``DualPatchEncoder`` (two PatchEmbed3D + shared trunk) for mismatched.
+      - ``"cnn"``: ``ConvEncoder`` for matched, ``DualConvEncoder`` (two stems
+        + shared trunk) for mismatched.
+
+    For the EMA target encoder we always build a *second* instance via this
+    same function. Both instances therefore have identical architecture and
+    EMA across all parameters works trivially regardless of routing.
+    """
     m = cfg["model"]
     d = cfg["data"]
+    backbone = m.get("backbone", "vit")
 
     ctx_ch = channels_for(d["context_channels"])
     tgt_ch = channels_for(d["target_channels"])
     same_branch = (d["context_channels"] == d["target_channels"])
 
-    if same_branch:
-        return build_encoder(
-            in_chans=ctx_ch,
+    if backbone == "vit":
+        if same_branch:
+            return build_encoder(
+                in_chans=ctx_ch,
+                size=m["encoder_size"],
+                img_size=m["encoder"]["img_size"],
+                patch_size=m["encoder"]["patch_size"],
+                num_frames=m["encoder"]["num_frames"],
+                tubelet_size=m["encoder"]["tubelet_size"],
+                mlp_ratio=m["encoder"]["mlp_ratio"],
+                drop_rate=m["encoder"]["drop_rate"],
+                attn_drop_rate=m["encoder"]["attn_drop_rate"],
+                uniform_power=m["encoder"]["uniform_power"],
+            ).to(device)
+        return DualPatchEncoder(
+            ctx_in_chans=ctx_ch,
+            tgt_in_chans=tgt_ch,
             size=m["encoder_size"],
             img_size=m["encoder"]["img_size"],
             patch_size=m["encoder"]["patch_size"],
@@ -113,19 +140,41 @@ def build_encoder_from_config(cfg: dict, device: torch.device) -> torch.nn.Modul
             attn_drop_rate=m["encoder"]["attn_drop_rate"],
             uniform_power=m["encoder"]["uniform_power"],
         ).to(device)
-    return DualPatchEncoder(
-        ctx_in_chans=ctx_ch,
-        tgt_in_chans=tgt_ch,
-        size=m["encoder_size"],
-        img_size=m["encoder"]["img_size"],
-        patch_size=m["encoder"]["patch_size"],
-        num_frames=m["encoder"]["num_frames"],
-        tubelet_size=m["encoder"]["tubelet_size"],
-        mlp_ratio=m["encoder"]["mlp_ratio"],
-        drop_rate=m["encoder"]["drop_rate"],
-        attn_drop_rate=m["encoder"]["attn_drop_rate"],
-        uniform_power=m["encoder"]["uniform_power"],
-    ).to(device)
+
+    if backbone == "cnn":
+        if same_branch:
+            return ConvEncoder(
+                in_chans=ctx_ch,
+                embed_dim=m["encoder"]["embed_dim"],
+                base_channels=m["encoder"]["base_channels"],
+                num_stages=m["encoder"]["num_stages"],
+                res_blocks_per_stage=m["encoder"]["res_blocks_per_stage"],
+                tubelet_size=m["encoder"]["tubelet_size"],
+                dropout=m["encoder"].get("dropout", 0.0),
+            ).to(device)
+        return DualConvEncoder(
+            ctx_in_chans=ctx_ch,
+            tgt_in_chans=tgt_ch,
+            embed_dim=m["encoder"]["embed_dim"],
+            base_channels=m["encoder"]["base_channels"],
+            num_stages=m["encoder"]["num_stages"],
+            res_blocks_per_stage=m["encoder"]["res_blocks_per_stage"],
+            tubelet_size=m["encoder"]["tubelet_size"],
+            dropout=m["encoder"].get("dropout", 0.0),
+        ).to(device)
+
+    raise ValueError(f"unknown model.backbone: {backbone!r}")
+
+
+def _embed_dim_from_config(cfg: dict) -> int:
+    """Look up the encoder's output dimension regardless of backbone family."""
+    m = cfg["model"]
+    backbone = m.get("backbone", "vit")
+    if backbone == "vit":
+        return embed_dim_for(m["encoder_size"])
+    if backbone == "cnn":
+        return int(m["encoder"]["embed_dim"])
+    raise ValueError(f"unknown model.backbone: {backbone!r}")
 
 
 def build_from_config(cfg: dict, device: torch.device):
@@ -147,11 +196,24 @@ def build_from_config(cfg: dict, device: torch.device):
     m = cfg["model"]
     enc = build_encoder_from_config(cfg, device)
 
-    D_enc = embed_dim_for(m["encoder_size"])
+    D_enc = _embed_dim_from_config(cfg)
+
+    # The predictor's positional embedding grid is determined by an effective
+    # ``patch_size`` and ``tubelet_size``: for the ViT these come straight from
+    # the config; for the CNN, the effective patch size is the total spatial
+    # downsampling (2 ** num_stages), since each stride-2 stage halves H/W.
+    backbone = m.get("backbone", "vit")
+    if backbone == "vit":
+        eff_patch = m["encoder"]["patch_size"]
+    elif backbone == "cnn":
+        eff_patch = 2 ** int(m["encoder"]["num_stages"])
+    else:
+        raise ValueError(f"unknown model.backbone: {backbone!r}")
+
     pred = build_predictor(
         embed_dim=D_enc,
         img_size=m["encoder"]["img_size"],
-        patch_size=m["encoder"]["patch_size"],
+        patch_size=eff_patch,
         num_frames=m["encoder"]["num_frames"],
         tubelet_size=m["encoder"]["tubelet_size"],
         predictor_embed_dim=m["predictor"]["predictor_embed_dim"],

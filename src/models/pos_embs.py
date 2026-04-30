@@ -69,21 +69,6 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
     return pos_embed
 
 
-def get_1d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
-    """
-    embed_dim: output dimension for each position
-    grid_size: int of the grid length
-    returns:
-        pos_embed: [grid_size, embed_dim] (w/o cls_token)
-                or [1+grid_size, embed_dim] (w/ cls_token)
-    """
-    grid = np.arange(grid_size, dtype=float)
-    pos_embed = get_1d_sincos_pos_embed_from_grid(embed_dim, grid)
-    if cls_token:
-        pos_embed = np.concatenate([np.zeros([1, embed_dim]), pos_embed], axis=0)
-    return pos_embed
-
-
 def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     """
     embed_dim: output dimension for each position

@@ -29,7 +29,11 @@ from typing import Callable, Optional
 import torch
 
 from src.models.encoder import count_parameters, num_tokens
-from src.train.builders import build_from_config, build_loader
+from src.train.builders import (
+    build_encoder_from_config,
+    build_from_config,
+    build_loader,
+)
 from src.train.checkpoint import (
     find_latest_checkpoint,
     load_checkpoint,
@@ -37,9 +41,34 @@ from src.train.checkpoint import (
     save_checkpoint,
     write_run_config,
 )
+from src.models.cnn_encoder import cnn_num_tokens
 from src.train.djepa_optim import build_optimizer_and_scheds
+from src.train.ema import EMAUpdater, initialize_target_from_online
 from src.train.manifest import append_run, update_run
 from src.train.step import StepMetrics, now_ms, train_one_step
+
+
+def _summary_num_tokens(cfg: dict) -> int:
+    """Token count for the configured backbone — matters for the final.json
+    summary line. Branches on ``model.backbone`` since the per-backbone token
+    formulas differ."""
+    m = cfg["model"]
+    backbone = m.get("backbone", "vit")
+    if backbone == "vit":
+        return num_tokens(
+            img_size=m["encoder"]["img_size"],
+            num_frames=m["encoder"]["num_frames"],
+            patch_size=m["encoder"]["patch_size"],
+            tubelet_size=m["encoder"]["tubelet_size"],
+        )
+    if backbone == "cnn":
+        return cnn_num_tokens(
+            img_size=m["encoder"]["img_size"],
+            num_frames=m["encoder"]["num_frames"],
+            num_stages=m["encoder"]["num_stages"],
+            tubelet_size=m["encoder"]["tubelet_size"],
+        )
+    raise ValueError(f"unknown model.backbone: {backbone!r}")
 
 
 def train(
@@ -77,6 +106,22 @@ def train(
     # Build everything.
     encoder, predictor, loss_fn = build_from_config(cfg, device)
     train_loader = build_loader(cfg, split="train", shuffle=True)
+
+    # Optional EMA target encoder. Initialized as a copy of the online encoder
+    # so the predictor has a meaningful target on the first batch (BYOL/V-JEPA
+    # convention; not random init).
+    target_type = cfg.get("train", {}).get("target_type", "shared_stopgrad")
+    ema_decay = float(cfg.get("train", {}).get("ema_decay", 0.996))
+    target_encoder: Optional[torch.nn.Module] = None
+    ema_updater: Optional[EMAUpdater] = None
+    if target_type == "ema":
+        target_encoder = build_encoder_from_config(cfg, device)
+        initialize_target_from_online(target_encoder, encoder)
+        target_encoder.eval()  # disables dropout etc. — target should be deterministic
+        ema_updater = EMAUpdater(target_encoder, encoder, decay=ema_decay)
+        print(f"[ema] target encoder enabled, decay={ema_decay}", flush=True)
+    elif target_type != "shared_stopgrad":
+        raise ValueError(f"unknown train.target_type: {target_type!r}")
 
     num_epochs = max_epochs if max_epochs is not None else cfg["optim"]["num_epochs"]
     steps_per_epoch = max(1, len(train_loader))
@@ -121,6 +166,7 @@ def train(
                 lr_sched=lr_sched,
                 wd_sched=wd_sched,
                 scaler=scaler,
+                target_encoder=target_encoder,
                 map_location=str(device),
             )
             global_step = payload["global_step"]
@@ -158,7 +204,10 @@ def train(
                     loss_fn=loss_fn, optimizer=optimizer,
                     lr_sched=lr_sched, wd_sched=wd_sched,
                     scaler=scaler, cfg=cfg, device=device,
+                    target_encoder=target_encoder,
                 )
+                if ema_updater is not None:
+                    ema_updater.step()
                 global_step += 1
                 last_metrics = StepMetrics(
                     step=global_step, epoch=epoch,
@@ -191,6 +240,7 @@ def train(
                         encoder=encoder, predictor=predictor,
                         optimizer=optimizer, lr_sched=lr_sched, wd_sched=wd_sched,
                         global_step=global_step, epoch=epoch, config=cfg, scaler=scaler,
+                        target_encoder=target_encoder,
                     )
                     prune_old_checkpoints(run_dir, keep_last_n)
 
@@ -204,6 +254,7 @@ def train(
                 encoder=encoder, predictor=predictor,
                 optimizer=optimizer, lr_sched=lr_sched, wd_sched=wd_sched,
                 global_step=global_step, epoch=epoch + 1, config=cfg, scaler=scaler,
+                target_encoder=target_encoder,
             )
             prune_old_checkpoints(run_dir, keep_last_n)
             if max_steps is not None and global_step >= max_steps:
@@ -236,12 +287,7 @@ def train(
         "predictor_params": count_parameters(predictor),
         "total_steps_planned": total_steps,
         "warmup_steps": warmup_steps,
-        "num_tokens": num_tokens(
-            img_size=cfg["model"]["encoder"]["img_size"],
-            num_frames=cfg["model"]["encoder"]["num_frames"],
-            patch_size=cfg["model"]["encoder"]["patch_size"],
-            tubelet_size=cfg["model"]["encoder"]["tubelet_size"],
-        ),
+        "num_tokens": _summary_num_tokens(cfg),
     }
     # Persist summary alongside run dir.
     with open(run_dir / "final.json", "w") as f:

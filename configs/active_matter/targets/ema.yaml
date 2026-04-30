@@ -1,0 +1,13 @@
+# EMA target encoder (BYOL/MoCo style). Two encoder instances sharing
+# architecture; the target's parameters are an exponential moving average of
+# the online (context) encoder's:
+#
+#     p_target = decay * p_target + (1 - decay) * p_online
+#
+# Updated once per optimizer step. The target is initialized as a copy of
+# the online encoder so the first batch's predictor target is meaningful.
+# Provides anti-collapse via the moving target signal; pairs naturally with
+# either SIGReg or VICReg as a stacked regularizer.
+train:
+  target_type: "ema"
+  ema_decay: 0.996

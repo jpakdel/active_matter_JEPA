@@ -1,0 +1,65 @@
+{
+  "seed": 0,
+  "data": {
+    "data_dir": "../data/active_matter",
+    "num_frames": 16,
+    "stride": null,
+    "noise_std": 0.0,
+    "context_channels": "all",
+    "target_channels": "all"
+  },
+  "train": {
+    "target_type": "ema",
+    "ema_decay": 0.996
+  },
+  "optim": {
+    "batch_size": 2,
+    "num_workers": 4,
+    "num_epochs": 30,
+    "lr": 0.0003,
+    "start_lr": 1e-06,
+    "final_lr": 1e-06,
+    "warmup_epochs": 2,
+    "weight_decay": 0.05,
+    "final_weight_decay": 0.4,
+    "wd_exclude_bias_and_norm": true,
+    "grad_clip": 1.0,
+    "use_amp": false,
+    "compile": false
+  },
+  "log": {
+    "out_dir": "runs",
+    "log_every_steps": 10,
+    "val_every_epochs": 1,
+    "save_every_steps": 500,
+    "keep_last_n_ckpts": 3
+  },
+  "experiment": "baseline",
+  "run_name": "baseline_v0",
+  "model": {
+    "backbone": "cnn",
+    "encoder_size": "cnn",
+    "encoder": {
+      "img_size": 256,
+      "num_frames": 16,
+      "tubelet_size": 2,
+      "embed_dim": 256,
+      "base_channels": 48,
+      "num_stages": 4,
+      "res_blocks_per_stage": 1,
+      "dropout": 0.0
+    },
+    "predictor": {
+      "predictor_embed_dim": 256,
+      "depth": 6,
+      "num_heads": 8,
+      "mlp_ratio": 4.0
+    }
+  },
+  "loss": {
+    "reg_type": "vicreg",
+    "lambda_sigreg": 0.1,
+    "vicreg_var_weight": 25.0,
+    "vicreg_cov_weight": 1.0
+  }
+}

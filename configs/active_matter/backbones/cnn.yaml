@@ -1,0 +1,38 @@
+# CNN backbone preset. Mirrors the teammate's ConvEncoder structure
+# (factorized 2D spatial + temporal Conv1d, ~3.7M params at the defaults).
+#
+# embed_dim is the final token dimension. base_channels is the channel
+# count after the stem; each stage doubles it and halves spatial resolution.
+# num_stages stride-2 downsamples → 2^num_stages reduction in H/W.
+model:
+  backbone: "cnn"
+  # encoder_size is unused for CNN but kept in schema so the merged config
+  # loads without per-axis branching. The CNN-specific knobs live under
+  # encoder:.
+  encoder_size: "cnn"
+  encoder:
+    img_size: 256
+    num_frames: 16
+    tubelet_size: 2          # temporal downsampling factor
+    embed_dim: 256
+    base_channels: 48
+    num_stages: 4            # 2^4 = 16x spatial downsample → 16x16 = 256 spatial tokens,
+                             # matching ViT-small at patch_size=16. With T_out=8 → 2048 tokens.
+    res_blocks_per_stage: 1
+    dropout: 0.0
+  predictor:
+    # Predictor embed_dim matches the encoder's output (256 here, not 384).
+    predictor_embed_dim: 256
+    depth: 6
+    num_heads: 8             # 256/8 = 32 head dim
+    mlp_ratio: 4.0
+
+optim:
+  # AMP fp16 disabled for CNN backbone. The CPU shape test and the one-shot
+  # GPU smoke both pass under AMP, but sustained training NaN's on the
+  # backward pass — see LESSONS_LEARNED.md "CNN encoder NaN under AMP fp16".
+  # Forward activations stay healthy in fp16 (peak ~26, well under 6.5e4),
+  # so the overflow is in fp16 gradients somewhere (GroupNorm or attention
+  # softmax are likely). fp32 is ~2x slower per step but stable. This
+  # override only applies to CNN runs; ViT keeps AMP on per default.yaml.
+  use_amp: false

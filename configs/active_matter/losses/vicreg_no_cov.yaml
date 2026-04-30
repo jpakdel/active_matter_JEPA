@@ -1,0 +1,10 @@
+# VICReg with covariance term disabled (variance-hinge only).
+#
+# This preset matches the teammate's loss formulation exactly: cosine-style
+# prediction MSE + per-dim variance hinge (`var_weight=25`), no off-diagonal
+# covariance penalty. Use it when comparing our results to his head-to-head.
+loss:
+  reg_type: "vicreg"
+  lambda_sigreg: 0.1
+  vicreg_var_weight: 25.0
+  vicreg_cov_weight: 0.0      # variance-only — no decorrelation pressure

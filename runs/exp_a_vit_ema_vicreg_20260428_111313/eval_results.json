@@ -1,0 +1,101 @@
+{
+  "run_dir": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313",
+  "checkpoint": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\checkpoints\\ckpt_0010500.pt",
+  "meta": {
+    "checkpoint": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\checkpoints\\ckpt_0010500.pt",
+    "config_path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\config.json",
+    "global_step": 10500,
+    "epoch": 30,
+    "pool": "mean",
+    "embed_dim": 384,
+    "encoder_size": "small",
+    "context_channels": "D",
+    "splits": {
+      "train": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\features\\train.pt",
+        "N": 700
+      },
+      "val": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\features\\val.pt",
+        "N": 96
+      },
+      "test": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_a_vit_ema_vicreg_20260428_111313\\features\\test.pt",
+        "N": 104
+      }
+    }
+  },
+  "linear_probe": {
+    "target_names": [
+      "alpha",
+      "zeta"
+    ],
+    "val_mse": [
+      0.06623808294534683,
+      0.18085132539272308
+    ],
+    "test_mse": [
+      0.06761923432350159,
+      0.17840178310871124
+    ],
+    "best_alpha": 0.01,
+    "alpha_grid": [
+      0.0001,
+      0.001,
+      0.01,
+      0.1,
+      1.0,
+      10.0,
+      100.0
+    ],
+    "stats": {
+      "means": [
+        -3.022857189178467,
+        9.022856712341309
+      ],
+      "stds": [
+        1.45387864112854,
+        5.210927486419678
+      ]
+    }
+  },
+  "knn": {
+    "target_names": [
+      "alpha",
+      "zeta"
+    ],
+    "val_mse": [
+      0.1155346930027008,
+      0.37526342272758484
+    ],
+    "test_mse": [
+      0.17184890806674957,
+      0.41092345118522644
+    ],
+    "best_k": 3,
+    "best_metric": "cosine",
+    "k_grid": [
+      1,
+      3,
+      5,
+      10,
+      20,
+      50,
+      100
+    ],
+    "metric_grid": [
+      "l2",
+      "cosine"
+    ],
+    "stats": {
+      "means": [
+        -3.022857189178467,
+        9.022856712341309
+      ],
+      "stds": [
+        1.45387864112854,
+        5.210927486419678
+      ]
+    }
+  }
+}

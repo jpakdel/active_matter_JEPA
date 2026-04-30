@@ -137,13 +137,3 @@ def extract_u(x: Tensor) -> Tensor:
     if x.ndim == 4:
         return x[U]
     raise ValueError(f"extract_u expects 4D or 5D tensor, got ndim={x.ndim}")
-
-
-def compute_divD_from_sample(x: Tensor, spacing: Tuple[float, float] = (1.0, 1.0)) -> Tensor:
-    """Convenience: (C=11, T, H, W) or (B, 11, T, H, W) -> (..., 2, T, H, W)."""
-    return divergence_D(extract_D(x), spacing=spacing)
-
-
-def compute_laplacianU_from_sample(x: Tensor, spacing: Tuple[float, float] = (1.0, 1.0)) -> Tensor:
-    """Convenience: (C=11, T, H, W) or (B, 11, T, H, W) -> (..., 2, T, H, W)."""
-    return laplacian_u(extract_u(x), spacing=spacing)

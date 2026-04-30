@@ -1,0 +1,4 @@
+# Smoke tests are local-only; not committed to the repo.
+# Re-run by invoking the .py files directly.
+*
+!.gitignore

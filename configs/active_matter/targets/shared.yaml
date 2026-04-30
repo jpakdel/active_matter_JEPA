@@ -1,0 +1,6 @@
+# Shared encoder, stop-grad target. The original D-JEPA recipe — one encoder
+# instance, both context and target run through it, gradients only flow
+# through the context branch (target uses no_grad). Anti-collapse comes
+# entirely from the loss-side regularizer (SIGReg or VICReg).
+train:
+  target_type: "shared_stopgrad"

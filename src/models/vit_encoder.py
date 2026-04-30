@@ -280,34 +280,9 @@ def vit_large(patch_size=16, **kwargs):
     return model
 
 
-def vit_huge(patch_size=16, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=1280, depth=32, num_heads=16, mlp_ratio=4,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    return model
-
-
-def vit_giant(patch_size=16, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=1408, depth=40, num_heads=16, mlp_ratio=48/11,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    return model
-
-
-def vit_gigantic(patch_size=14, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=1664, depth=48, num_heads=16, mpl_ratio=64/13,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs
-    )
-    return model
-
-
 VIT_EMBED_DIMS = {
     'vit_tiny': 192,
     'vit_small': 384,
     'vit_base': 768,
     'vit_large': 1024,
-    'vit_huge': 1280,
-    'vit_giant': 1408,
-    'vit_gigantic': 1664,
 }

@@ -1,20 +1,25 @@
 """Layered config loader.
 
-Builds a final config dict by deep-merging a base default, an experiment
-routing override, and a regularizer preset, in that order.
+Builds a final config dict by deep-merging four axes, in this order:
 
     final = default.yaml
-            <merged with> <routing>.yaml
-            <merged with> presets/<reg>.yaml
-            <merged with> --override key=value flags
+            <merge> routings/<routing>.yaml          (channel routing: which
+                                                      channels feed ctx vs tgt)
+            <merge> backbones/<backbone>.yaml        (model architecture: vit | cnn)
+            <merge> targets/<target>.yaml            (target encoder type:
+                                                      shared_stopgrad | ema)
+            <merge> losses/<loss>.yaml               (regularizer family + knobs)
+            <merge> --override key=value flags
 
-This replaces the 30-file ``configs/active_matter/djepa_*_*.yaml`` sweep with
-1 default + 3 routings + 9 presets.
+This replaces the original 30-file ``configs/active_matter/djepa_*_*.yaml``
+sweep with 1 default + 3 routings + 2 backbones + 2 targets + N losses.
 
 Usage:
     from src.config_loader import load_layered_config
-    cfg = load_layered_config(routing="exp_a", reg="vicreg",
-                              overrides={"optim.batch_size": 4})
+    cfg = load_layered_config(
+        routing="exp_a", backbone="vit", target="ema", loss="vicreg",
+        overrides={"optim.batch_size": "4"},
+    )
 """
 
 from __future__ import annotations
@@ -80,26 +85,32 @@ def _coerce_scalar(s: str):
 def load_layered_config(
     *,
     routing: str,
-    reg: str,
+    backbone: str = "vit",
+    target: str = "shared",
+    loss: str,
     overrides: Optional[Mapping[str, str]] = None,
     config_root: Optional[Path] = None,
 ) -> dict:
     """Compose the final config dict.
 
     Args:
-        routing: ``"baseline"`` | ``"exp_a"`` | ``"exp_b"``.
-        reg: name of a file under ``configs/active_matter/presets/`` (without
-            the ``.yaml`` suffix). E.g. ``"sigreg"``, ``"vicreg_lam001"``.
+        routing: ``"baseline"`` | ``"exp_a"`` | ``"exp_b"``. Sets data routing.
+        backbone: file stem under ``configs/active_matter/backbones/``,
+            currently ``"vit"`` or ``"cnn"``.
+        target: file stem under ``configs/active_matter/targets/``,
+            currently ``"shared"`` or ``"ema"``.
+        loss: file stem under ``configs/active_matter/losses/``. E.g.
+            ``"sigreg"``, ``"vicreg_lam001"``, ``"vicreg_no_cov"``.
         overrides: optional flat dict of dotted-key strings, e.g.
             ``{"optim.batch_size": "4"}``. Values are coerced (bool/int/float).
         config_root: override config dir for testing.
     """
     root = config_root if config_root is not None else CONFIG_ROOT
-    default = _load_yaml(root / "default.yaml")
-    routing_cfg = _load_yaml(root / f"{routing}.yaml")
-    preset_cfg = _load_yaml(root / "presets" / f"{reg}.yaml")
-    cfg = _deep_merge(default, routing_cfg)
-    cfg = _deep_merge(cfg, preset_cfg)
+    cfg = _load_yaml(root / "default.yaml")
+    cfg = _deep_merge(cfg, _load_yaml(root / f"{routing}.yaml"))
+    cfg = _deep_merge(cfg, _load_yaml(root / "backbones" / f"{backbone}.yaml"))
+    cfg = _deep_merge(cfg, _load_yaml(root / "targets" / f"{target}.yaml"))
+    cfg = _deep_merge(cfg, _load_yaml(root / "losses" / f"{loss}.yaml"))
     if overrides:
         for k, v in overrides.items():
             _set_dotted(cfg, k, _coerce_scalar(v))

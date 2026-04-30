@@ -1,0 +1,101 @@
+{
+  "run_dir": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528",
+  "checkpoint": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\checkpoints\\ckpt_0010500.pt",
+  "meta": {
+    "checkpoint": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\checkpoints\\ckpt_0010500.pt",
+    "config_path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\config.json",
+    "global_step": 10500,
+    "epoch": 30,
+    "pool": "mean",
+    "embed_dim": 384,
+    "encoder_size": "small",
+    "context_channels": "divD",
+    "splits": {
+      "train": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\features\\train.pt",
+        "N": 700
+      },
+      "val": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\features\\val.pt",
+        "N": 96
+      },
+      "test": {
+        "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\exp_b_vit_ema_vicreg_no_cov_20260428_151528\\features\\test.pt",
+        "N": 104
+      }
+    }
+  },
+  "linear_probe": {
+    "target_names": [
+      "alpha",
+      "zeta"
+    ],
+    "val_mse": [
+      0.5770227313041687,
+      0.3427521288394928
+    ],
+    "test_mse": [
+      0.5874176621437073,
+      0.3415285646915436
+    ],
+    "best_alpha": 0.0001,
+    "alpha_grid": [
+      0.0001,
+      0.001,
+      0.01,
+      0.1,
+      1.0,
+      10.0,
+      100.0
+    ],
+    "stats": {
+      "means": [
+        -3.022857189178467,
+        9.022856712341309
+      ],
+      "stds": [
+        1.45387864112854,
+        5.210927486419678
+      ]
+    }
+  },
+  "knn": {
+    "target_names": [
+      "alpha",
+      "zeta"
+    ],
+    "val_mse": [
+      0.6394599080085754,
+      0.5760097503662109
+    ],
+    "test_mse": [
+      0.6360784769058228,
+      0.4873669147491455
+    ],
+    "best_k": 10,
+    "best_metric": "cosine",
+    "k_grid": [
+      1,
+      3,
+      5,
+      10,
+      20,
+      50,
+      100
+    ],
+    "metric_grid": [
+      "l2",
+      "cosine"
+    ],
+    "stats": {
+      "means": [
+        -3.022857189178467,
+        9.022856712341309
+      ],
+      "stds": [
+        1.45387864112854,
+        5.210927486419678
+      ]
+    }
+  }
+}

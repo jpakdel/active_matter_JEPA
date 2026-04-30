@@ -1,31 +1,75 @@
-# D-JEPA on `active_matter` (refactored)
+# D-JEPA on `active_matter`
 
-Self-supervised representation learning on The Well's `active_matter` dataset. JEPA-style: a context encoder predicts a target encoder's embeddings under cross-channel masking, regularized either by SIGReg (slice-wise integrated-Gaussian distribution match) or by VICReg (variance + covariance hinge).
+Self-supervised representation learning on The Well's `active_matter` simulation dataset, with linear-probe and kNN evaluation against two underlying physical parameters: **α** (active dipole strength) and **ζ** (steric alignment).
 
-This is a refactor of the original codebase one directory up. Same models, same losses, same eval pipeline — just split into smaller files, deduplicated, and configured through a layered YAML scheme instead of one config file per sweep cell.
+The setup is JEPA-style — a context encoder produces a latent representation, a predictor maps it forward, and the prediction is matched to a target encoder's output of a sibling sample. Anti-collapse is provided by either a **variance-hinge regularizer** (VICReg-style, with optional decorrelation), a **distribution-match regularizer** (SIGReg from LeJEPA), or an **EMA target encoder** (BYOL-style), or any combination.
+
+The project's core question: **does any architectural / loss / target-encoder configuration produce frozen features from which α and ζ are linearly recoverable?**
+
+---
+
+## Headline results
+
+After 26 trained-and-evaluated runs across a 4-axis design space, the project leaders are:
+
+| Metric | Best run | Test MSE (z-scored, lower=better) |
+|---|---|---|
+| **α kNN** | `baseline + cnn + ema + vicreg_no_cov` | **0.0131** |
+| **α linear** | same | **0.0195** |
+| **ζ kNN** | `baseline + vit + ema + vicreg` | **0.144** |
+| **ζ linear** | same | **0.133** |
+
+Two different best-of configurations for the two physical parameters: CNN dominates α, ViT dominates ζ. Same channel routing (`baseline`, all 11 channels into both encoder branches), same target-encoder type (EMA), same loss family (VICReg) — only **backbone** and **covariance term** differ. Full table: [`results/PARETO.md`](results/PARETO.md).
+
+For all 26 runs, every metric, every hyperparameter: [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
 
 ---
 
 ## Quick start
 
 ```bash
-# train
-python scripts/train.py --routing exp_a --reg vicreg
+# Train one cell — pick one value from each axis
+python scripts/train.py \
+    --routing baseline \
+    --backbone cnn \
+    --target ema \
+    --loss vicreg_no_cov
 
-# eval a completed run
-python scripts/eval.py --run-dir runs/exp_a_vicreg_20260424_005651
+# Evaluate a finished run (linear probe + kNN against alpha/zeta)
+python scripts/eval.py --run-dir runs/<run_id>
 
-# representation analysis across multiple runs
+# Cross-run representation analysis (PCA, PC-correlations, residual leakage)
 python scripts/analyze.py
 ```
 
-`--routing` is one of `baseline`, `exp_a`, `exp_b` (channel-routing presets in `configs/active_matter/`). `--reg` is the file stem of any preset under `configs/active_matter/presets/` — currently `sigreg`, `sigreg_lam001`, `sigreg_lam1`, `vicreg`, `vicreg_lam001`, `vicreg_lam1`, `vicreg_varw10`, `vicreg_varw50`, `vicreg_covw5`.
+### The 4 axes
 
-CLI overrides on the merged config are dotted-key:
+| Axis | Values | Meaning |
+|---|---|---|
+| `--routing` | `baseline` / `exp_a` / `exp_b` | Which channels feed ctx and tgt: `baseline=all→all`, `exp_a=D→u`, `exp_b=∇·D→Δu` |
+| `--backbone` | `vit` / `cnn` | ViT-small (3D tubelet patch embed, ~23M params) or 2D-spatial CNN (~3.8M params) |
+| `--target` | `shared` / `ema` | Single shared encoder with stop-grad target, or BYOL-style EMA target encoder |
+| `--loss` | various | Loss preset under `configs/active_matter/losses/` (see below) |
+
+### Loss presets
+
+10 named presets parameterizing the regularizer family + knobs:
+
+- `sigreg`, `sigreg_lam001`, `sigreg_lam1` — SIGReg with outer scale 0.1 / 0.01 / 1.0
+- `vicreg`, `vicreg_lam001`, `vicreg_lam1` — VICReg full (variance hinge + cov term) at outer scale 0.1 / 0.01 / 1.0
+- `vicreg_no_cov` — VICReg with `cov_weight=0` (variance hinge only — matches teammate's recipe)
+- `vicreg_varw10`, `vicreg_varw50` — VICReg with variance hinge weight 10 or 50 (default 25)
+- `vicreg_covw5` — VICReg with covariance weight 5 (default 1)
+
+### CLI overrides
+
+Any leaf in the merged config can be overridden:
 
 ```bash
-python scripts/train.py --routing exp_b --reg vicreg \
-       --override optim.batch_size=4 --override optim.num_epochs=50
+python scripts/train.py \
+    --routing exp_b --backbone cnn --target ema --loss vicreg \
+    --override optim.batch_size=4 \
+    --override optim.num_epochs=50
 ```
 
 ---
@@ -34,88 +78,113 @@ python scripts/train.py --routing exp_b --reg vicreg \
 
 ```
 REFACTORED_CODEBASE/
-├── REFACTOR_PLAN.md              # how this tree was derived from the original
-├── README.md                     # you are here
-├── ENV.md                        # vendored-commit pins, dataset location
+├── README.md                     # this file
+├── COMPLETED.md                  # full project timeline + refactor history
+├── REFACTOR_PLAN.md              # design plan from the refactor pass
+├── ABLATION_PLAN.md              # tier-1/tier-2 cell ordering for the queue
+├── LESSONS_LEARNED.md            # bug log from the project (9 entries)
+├── ENV.md                        # vendored upstream commits, dataset path
 ├── requirements.txt
+│
 ├── configs/active_matter/
-│   ├── default.yaml              # base; full schema, all defaults
-│   ├── baseline.yaml             # routing: all → all
-│   ├── exp_a.yaml                # routing: D → u
-│   ├── exp_b.yaml                # routing: ∇·D → Δu
-│   └── presets/                  # regularizer presets, layered on top of routing
-│       ├── sigreg.yaml
-│       ├── sigreg_lam001.yaml
-│       ├── sigreg_lam1.yaml
-│       ├── vicreg.yaml
-│       ├── vicreg_lam001.yaml
-│       ├── vicreg_lam1.yaml
-│       ├── vicreg_varw10.yaml
-│       ├── vicreg_varw50.yaml
-│       └── vicreg_covw5.yaml
-├── src/
-│   ├── config_loader.py          # layered YAML merger
-│   ├── data/                     # WellDatasetForJEPA + derived fields ∇·D, Δu
-│   ├── eval/                     # extract_features, linear_probe, knn_regression, normalize_labels
+│   ├── default.yaml              # base; data, optim, log, schedule (the non-axis defaults)
+│   ├── {baseline,exp_a,exp_b}.yaml          # 3 routing presets
+│   ├── backbones/{vit,cnn}.yaml             # 2 backbone presets
+│   ├── targets/{shared,ema}.yaml            # 2 target-encoder presets
+│   └── losses/                              # 10 regularizer presets
+│
+├── src/                          # ~5,750 lines, 28 live modules
+│   ├── config_loader.py          # layered YAML merger (default + 4 axes + CLI overrides)
+│   ├── data/                     # WellDatasetForJEPA, derived fields (∇·D, Δu), channel map
+│   ├── eval/                     # frozen-encoder feature extract → ridge + kNN
 │   ├── losses/                   # DJepaLoss switch (sigreg | vicreg) + shared DDP helpers
-│   ├── masks/utils.py            # apply_masks (used by ViT)
-│   ├── models/                   # ViT encoder + DualPatchEncoder + simple predictor
-│   └── train/                    # builders, step, trainer, optimizer, schedulers, checkpoint, manifest
-└── scripts/
-    ├── train.py                  # main launcher
-    ├── eval.py                   # frozen-encoder eval (linear probe + kNN)
-    └── analyze.py                # PCA + PC-correlation + cross-prediction residuals
+│   ├── masks/utils.py            # apply_masks (used by ViT trunk)
+│   ├── models/                   # ViT encoder, CNN encoder, dual variants, predictor, pos embs
+│   └── train/                    # builders, train loop, optimizer, schedulers, EMA, checkpoint, manifest
+│
+├── scripts/
+│   ├── train.py                  # main launcher
+│   ├── eval.py                   # frozen-encoder eval (linear + kNN probe)
+│   ├── analyze.py                # PCA + PC-correlation + cross-prediction residuals across runs
+│   ├── recover_evals.sh          # mop-up: run eval on any run that has final.json but no eval_results.json
+│   ├── run_tier1_cnn.sh          # batch launcher for the 6-cell tier-1 CNN sweep (preserved as a template)
+│   └── _gen_results_docs.py      # rebuilds RUN_INVENTORY / METRICS / PARETO from live run dirs
+│
+├── results/                      # all metrics in one place
+│   ├── README.md                 # index for this folder
+│   ├── PARETO.md                 # top-5 by each of 4 metrics + Pareto frontier
+│   ├── ABLATION_EFFECTS.md       # paired-comparison ablation tables for every design axis
+│   ├── RUN_INVENTORY.md          # all 26 runs with all metrics + hyperparameters
+│   ├── METRICS.md                # wall time, parameter counts, final losses
+│   └── _runs.json                # machine-readable raw inventory
+│
+├── tests/                        # gitignored — local smoke tests only
+│   ├── test_imports.py           # all 28 modules import cleanly
+│   ├── test_config_loader.py     # layered config merge correctness
+│   ├── test_build_and_shapes.py  # CPU shape contract for every (backbone × routing) cell
+│   └── test_gpu_smoke.py         # GPU full-config one-step + branch routing assertion
+│
+└── runs/                         # per-run artifacts (checkpoints gitignored, manifest+meta tracked)
+    ├── manifest.tsv              # one row per run
+    └── <run_id>/
+        ├── config.json           # frozen merged config
+        ├── metrics.jsonl         # per-step training trajectory
+        ├── final.json            # wall time, final losses, param counts
+        ├── eval_results.json     # alpha/zeta probe scores
+        ├── checkpoints/          # gitignored
+        └── features/{train,val,test}.pt + meta.json   # gitignored except meta.json
 ```
 
 ---
 
-## What changed from the original repo
+## Reading the results
 
-| Concern | Before | After |
-|---|---|---|
-| Trainer file size | 550 lines, 6 concerns mixed | 3 files (`builders.py`, `step.py`, `trainer.py`) |
-| Encoder construction | duplicated across train + eval | shared via `src.train.builders.build_encoder_from_config` |
-| DDP helpers | duplicated in `sigreg.py` and `vicreg.py` | extracted to `src.losses._ddp` |
-| Configs | 30 near-identical YAMLs | 1 default + 3 routings + 9 regularizer presets |
-| `well_dataset.py` | 848 lines with 4 classes | 280 lines, only `WellDatasetForJEPA` |
-| Dead vendored code | 14 files (~2,400 lines) reachable only through each other | dropped |
+Start with [`results/PARETO.md`](results/PARETO.md) for top-5s and the joint (α, ζ) Pareto frontier.
 
-The full inventory and rationale are in `../REFACTOR_INVENTORY.md` (one directory up); the staged execution plan is in `REFACTOR_PLAN.md` (this directory).
+For per-axis design questions ("does adding the cov term help α on exp_a?"), see [`results/ABLATION_EFFECTS.md`](results/ABLATION_EFFECTS.md). It enumerates every paired comparison in the dataset where exactly one axis is toggled.
+
+For the full record (all 26 runs as one sortable table + per-routing breakouts + hyperparameters), see [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
+
+For training metadata (wall time, parameter counts, compute accounting), see [`results/METRICS.md`](results/METRICS.md).
 
 ---
 
-## Hooks left for the team merge
-
-Two follow-ups deliberately out of scope for this refactor — they belong to the team-merge pass with the parallel ConvNet-JEPA implementation.
-
-1. **CNN backbone.** The original `src/train/model_utils.py` was dead code containing a ConvNet encoder/predictor stack from the physics repo. It's not migrated. When merging with the teammate's ConvNet implementation, choose between repurposing that file or vendoring the teammate's interface, then add `model.backbone: "cnn"` as a switch alongside the current `"vit"` path in `src.train.builders.build_encoder_from_config`.
-
-2. **EMA target encoder.** The current loss has no momentum target — anti-collapse comes from SIGReg or VICReg. The teammate's pipeline runs an EMA target (BYOL-style) plus a variance hinge. Adding EMA is a localized change in `src.train.step.train_one_step`: replace the second `encoder_forward(...).detach()` call with a forward through a separate momentum-updated `target_encoder` whose params are an EMA of the context encoder. The hook would land in `src.train.trainer.train()` where it manages the EMA update each step.
-
----
-
-## Compute budget reproducibility
+## Reproducibility
 
 Every run produces:
 
-- `runs/<run_id>/config.json`  — frozen merged config
-- `runs/<run_id>/metrics.jsonl` — one JSON per optimizer step (loss components + step timings)
-- `runs/<run_id>/final.json`   — wall time, final losses, parameter counts, total tokens
-- `runs/<run_id>/checkpoints/`  — rotating checkpoints (default keep-last-3)
-- `runs/manifest.tsv`           — one row per run, status + wall hours + final metrics
+- `runs/<run_id>/config.json` — the exact merged config used (all 4 axes resolved + every override)
+- `runs/<run_id>/metrics.jsonl` — one JSON line per optimizer step (loss components + step-timing)
+- `runs/<run_id>/final.json` — wall time, final losses, parameter counts, num_tokens
+- `runs/<run_id>/checkpoints/` — rotating last-N checkpoints with full RNG state
+- `runs/<run_id>/eval_results.json` — α / ζ test MSE for ridge and kNN
+- `runs/manifest.tsv` — cross-run summary, one row per run
 
-The PDF's Reproducibility Checklist items are addressed by:
-- Fixed seed in `default.yaml` (`seed: 0`); recorded in every run's `config.json`.
-- Layered configs are deterministic; the exact merged config is dumped as `config.json`.
-- Parameter counts in `final.json` (`encoder_params`, `predictor_params`).
-- Wall time + GPU mem accounting in `metrics.jsonl` and `manifest.tsv`.
-- Mixed-precision flag in `config.json` (`optim.use_amp`).
-- No external data, no pretrained weights — see `ENV.md`.
+The PDF's reproducibility checklist is satisfied by:
+
+- **Fixed seed.** Default `seed: 0` in `default.yaml`, recorded per run.
+- **Exact data preprocessing.** All preprocessing flows through `src.data.well_dataset.WellDatasetForJEPA` and the derived-field kernels in `src.data.derived_fields`. Both deterministic.
+- **Full config dumped per run.** `config.json` is the resolved merge of every preset + override. Re-running with the same `config.json` gives the same trained model up to CUDA nondeterminism.
+- **Parameter counts in final.json.** Always under the 100M cap (ViT-small ~34M total; CNN ~8.6M total).
+- **Compute accounting.** `wall_s` per run; aggregate per-backbone in `results/METRICS.md`.
+- **Mixed precision flag.** `optim.use_amp` is in every config; ViT runs use AMP fp16, CNN runs use fp32 (NaN issues with AMP+CNN — see `LESSONS_LEARNED.md`).
+- **No external data or pretrained weights.** All vendored upstream commits pinned in `ENV.md`.
 
 ---
 
-## Caveats
+## What's vendored from where
 
-- This refactor was created in a sibling directory (`REFACTORED_CODEBASE/`) under the original repo root. The original `src/`, `scripts/`, `configs/` are untouched and remain a working backup.
-- `scripts/analyze.py` defaults to reading runs from `<parent>/runs/` so the previously-trained checkpoints stay accessible. Override with `DJEPA_RUNS_ROOT=<path>` env var.
-- The `run_eval.py` → `scripts/eval.py` rename: behavior is identical, just relocated. Old run dirs from the parent repo work unchanged when passed via `--run-dir ../runs/<run_id>`.
+- **V-JEPA** (https://github.com/facebookresearch/jepa @ `51c59d518fc63c08464af6de585f78ac0c7ed4d5`) — ViT encoder + transformer blocks + 3D patch embed + sincos position embeddings + cosine LR / WD schedulers. See `src/models/vit_encoder.py`, `src/models/modules.py`, `src/models/patch_embed.py`, `src/models/pos_embs.py`, `src/train/schedulers.py`.
+- **physical-representation-learning** (https://github.com/helenqu/physical-representation-learning @ `bb77f7b5b506ba793ca7e746e1d0e3c12f70c0db`) — `WellDatasetForJEPA`. See `src/data/well_dataset.py`.
+- **LeJEPA** (Balestriero & LeCun, arXiv 2511.08544; `rbalestr-lab/lejepa` @ `c293d291ca87cd4fddee9d3fffe4e914c7272052`) — SIGReg implementation. See `src/losses/sigreg.py`.
+- **VICReg** (Bardes, Ponce, LeCun. ICLR 2022. arXiv 2105.04906) — variance-invariance-covariance loss. Re-implemented in `src/losses/vicreg.py`.
+- **BYOL** (Grill et al. NeurIPS 2020. arXiv 2006.07733) — EMA target-encoder pattern. Implemented in `src/train/ema.py`.
+- **CNN backbone** — written fresh in `src/models/cnn_encoder.py`, parametrically following the structure used in the parallel project (`Tenoic/NYU-DL2026-FP`).
+
+Per-file headers reference the upstream path and commit when applicable.
+
+---
+
+## Project history
+
+For the chronological project narrative — what was done, what was tried, what worked, what failed — see [`COMPLETED.md`](COMPLETED.md). For the refactor design rationale, see [`REFACTOR_PLAN.md`](REFACTOR_PLAN.md). For the bug ledger from the development process, see [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).

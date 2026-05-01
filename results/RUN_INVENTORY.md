@@ -4,14 +4,16 @@ All training runs in the project: **34 total** (21 EMA new, 13 shared-encoder pr
 
 All MSE values are on z-scored targets (constant-mean baseline = 1.0; lower is better). N_train=700, N_val=96, N_test=104.
 
+**Bolding key.** Per-column **bold values** mark the best (lowest MSE) for that metric within the table. The bold **run_id** marks the top-performing model overall — defined as the run that wins the most of the four reported test metrics (a_lin, z_lin, a_kNN, z_kNN), with ties broken by lowest a_kNN. Currently: `baseline_vit_ema_vicreg_lam001_20260430_170646`.
+
 ---
 
 ## Compact table — all runs sorted by alpha kNN test MSE
 
 | run_id | routing | backbone | target | loss | a_lin | z_lin | a_kNN | z_kNN | wall (s) | source |
 |---|---|---|---|---|---|---|---|---|---|---|
-| baseline_cnn_ema_vicreg_no_cov_20260428_190830 | baseline | cnn | ema | vicreg_no_cov |   0.0195 |   0.3150 |   0.0131 |   0.7559 |   2765 | REFACTORED_CODEBASE/runs/ |
-| baseline_vit_ema_vicreg_lam001_20260430_170646 | baseline | vit | ema | vicreg_lam001 |   0.0063 |   0.0680 |   0.0147 |   0.1017 |   2808 | REFACTORED_CODEBASE/runs/ |
+| baseline_cnn_ema_vicreg_no_cov_20260428_190830 | baseline | cnn | ema | vicreg_no_cov |   0.0195 |   0.3150 | **0.0131** |   0.7559 |   2765 | REFACTORED_CODEBASE/runs/ |
+| **baseline_vit_ema_vicreg_lam001_20260430_170646** | baseline | vit | ema | vicreg_lam001 | **0.0063** | **0.0680** |   0.0147 | **0.1017** |   2808 | REFACTORED_CODEBASE/runs/ |
 | baseline_vit_ema_vicreg_varw10_20260430_193408 | baseline | vit | ema | vicreg_varw10 |   0.0370 |   0.2943 |   0.0455 |   0.4004 |   2793 | REFACTORED_CODEBASE/runs/ |
 | baseline_vit_ema_vicreg_20260428_102316 | baseline | vit | ema | vicreg |   0.0316 |   0.1332 |   0.0864 |   0.1443 |   2852 | REFACTORED_CODEBASE/runs/ |
 | exp_a_vit_ema_vicreg_lam001_20260430_202310 | exp_a | vit | ema | vicreg_lam001 |   0.0702 |   0.2174 |   0.1616 |   0.8070 |   2792 | REFACTORED_CODEBASE/runs/ |
@@ -49,12 +51,14 @@ All MSE values are on z-scored targets (constant-mean baseline = 1.0; lower is b
 
 ## Grouped by routing
 
+Per-column bolding here is **per routing** — each sub-table's best is bolded within its own routing slice.
+
 ### baseline
 
 | backbone | target | loss | a_lin | z_lin | a_kNN | z_kNN | a val_lin | z val_lin | final_pmse |
 |---|---|---|---|---|---|---|---|---|---|
-| cnn | ema | vicreg_no_cov |   0.0195 |   0.3150 |   0.0131 |   0.7559 |   0.0119 |   0.3788 |   0.0054 |
-| vit | ema | vicreg_lam001 |   0.0063 |   0.0680 |   0.0147 |   0.1017 |   0.0061 |   0.1098 |   0.2880 |
+| cnn | ema | vicreg_no_cov |   0.0195 |   0.3150 | **0.0131** |   0.7559 |   0.0119 |   0.3788 |   0.0054 |
+| vit | ema | vicreg_lam001 | **0.0063** | **0.0680** |   0.0147 | **0.1017** | **0.0061** | **0.1098** |   0.2880 |
 | vit | ema | vicreg_varw10 |   0.0370 |   0.2943 |   0.0455 |   0.4004 |   0.0278 |   0.2458 |   0.0191 |
 | vit | ema | vicreg |   0.0316 |   0.1332 |   0.0864 |   0.1443 |   0.0533 |   0.1099 |   0.0868 |
 | vit | ema | sigreg_lam001 |   0.2090 |   0.3266 |   0.1732 |   0.4035 |   0.2087 |   0.3451 |   0.9160 |
@@ -69,11 +73,11 @@ All MSE values are on z-scored targets (constant-mean baseline = 1.0; lower is b
 
 | backbone | target | loss | a_lin | z_lin | a_kNN | z_kNN | a val_lin | z val_lin | final_pmse |
 |---|---|---|---|---|---|---|---|---|---|
-| vit | ema | vicreg_lam001 |   0.0702 |   0.2174 |   0.1616 |   0.8070 |   0.0808 |   0.2486 |   0.0699 |
-| vit | ema | vicreg |   0.0676 |   0.1784 |   0.1718 |   0.4109 |   0.0662 |   0.1809 |   0.2888 |
+| vit | ema | vicreg_lam001 |   0.0702 |   0.2174 | **0.1616** |   0.8070 |   0.0808 |   0.2486 |   0.0699 |
+| vit | ema | vicreg | **0.0676** | **0.1784** |   0.1718 |   0.4109 |   0.0662 | **0.1809** |   0.2888 |
 | vit | shared | vicreg_lam001 |   0.0900 |   0.2548 |   0.2016 |   0.6704 |   0.0777 |   0.2928 |   0.1771 |
-| cnn | ema | vicreg |   0.1601 |   0.2832 |   0.2027 |   0.3355 |   0.0866 |   0.3123 |   0.7607 |
-| vit | shared | vicreg |   0.0869 |   0.2455 |   0.2037 |   0.6745 |   0.0578 |   0.2704 |   0.2533 |
+| cnn | ema | vicreg |   0.1601 |   0.2832 |   0.2027 | **0.3355** |   0.0866 |   0.3123 |   0.7607 |
+| vit | shared | vicreg |   0.0869 |   0.2455 |   0.2037 |   0.6745 | **0.0578** |   0.2704 |   0.2533 |
 | vit | ema | sigreg |   0.1753 |   0.3754 |   0.3020 |   0.4614 |   0.1808 |   0.3605 |   0.6757 |
 | vit | shared | sigreg |   0.2141 |   0.3143 |   0.3352 |   0.3977 |   0.1747 |   0.3876 |   0.7068 |
 | cnn | ema | vicreg_no_cov |   0.2998 |   0.6986 |   0.3911 |   0.9473 |   0.1890 |   0.6764 |   1.2949 |
@@ -82,13 +86,13 @@ All MSE values are on z-scored targets (constant-mean baseline = 1.0; lower is b
 
 | backbone | target | loss | a_lin | z_lin | a_kNN | z_kNN | a val_lin | z val_lin | final_pmse |
 |---|---|---|---|---|---|---|---|---|---|
-| cnn | ema | vicreg |   0.2353 |   0.2806 |   0.4101 |   0.4874 |   0.2211 |   0.2421 |   0.1304 |
-| cnn | ema | vicreg_lam001 |   0.2362 |   0.2054 |   0.4753 |   0.3641 |   0.1459 |   0.2226 |   0.1455 |
+| cnn | ema | vicreg | **0.2353** |   0.2806 | **0.4101** |   0.4874 |   0.2211 |   0.2421 |   0.1304 |
+| cnn | ema | vicreg_lam001 |   0.2362 |   0.2054 |   0.4753 |   0.3641 | **0.1459** | **0.2226** |   0.1455 |
 | vit | shared | sigreg_lam1 |   0.4881 |   0.3955 |   0.5166 |   0.5546 |   0.5570 |   0.4359 |   0.2080 |
 | vit | shared | sigreg |   0.5932 |   0.4252 |   0.5402 |   0.5342 |   0.5445 |   0.4305 |   0.2330 |
 | cnn | ema | vicreg_no_cov |   0.4569 |   0.3153 |   0.5413 |   0.4254 |   0.5174 |   0.4110 |   0.5535 |
 | vit | ema | sigreg |   0.4478 |   0.3924 |   0.5804 |   0.5428 |   0.5027 |   0.3610 |   0.0799 |
-| vit | shared | vicreg_lam001 |   0.6592 |   0.2004 |   0.6235 |   0.1894 |   0.4636 |   0.2795 |   0.0258 |
+| vit | shared | vicreg_lam001 |   0.6592 | **0.2004** |   0.6235 | **0.1894** |   0.4636 |   0.2795 |   0.0258 |
 | vit | ema | vicreg_no_cov |   0.5874 |   0.3415 |   0.6361 |   0.4874 |   0.5770 |   0.3428 |   0.0000 |
 | vit | ema | vicreg |   0.7162 |   0.8886 |   0.7510 |   1.0668 |   0.7368 |   0.8145 |   0.0007 |
 | vit | shared | vicreg_covw5 |   0.7573 |   0.9224 |   0.7616 |   1.0910 |   0.7396 |   0.8800 |   0.0011 |
@@ -113,7 +117,7 @@ Held-constant across every run: `lr=3e-4`, `batch_size=2`, `num_epochs=30`, `tot
 | baseline_vit_ema_sigreg_lam001_20260430_184504 |  0.010 |    n/a |    n/a |  0.996 | True |
 | baseline_vit_ema_sigreg_lam1_20260430_175604 |  1.000 |    n/a |    n/a |  0.996 | True |
 | baseline_vit_ema_vicreg_20260428_102316 |  0.100 |   25.0 |    1.0 |  0.996 | True |
-| baseline_vit_ema_vicreg_lam001_20260430_170646 |  0.010 |   25.0 |    1.0 |  0.996 | True |
+| **baseline_vit_ema_vicreg_lam001_20260430_170646** |  0.010 |   25.0 |    1.0 |  0.996 | True |
 | baseline_vit_ema_vicreg_no_cov_20260430_161748 |  0.100 |   25.0 |    0.0 |  0.996 | True |
 | baseline_vit_ema_vicreg_varw10_20260430_193408 |  0.100 |   10.0 |    1.0 |  0.996 | True |
 | djepa_baseline_vicreg_v0_20260424_000719 |  0.100 |   25.0 |    1.0 |    n/a | True |

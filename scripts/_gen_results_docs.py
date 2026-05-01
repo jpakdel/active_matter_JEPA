@@ -143,7 +143,63 @@ def fmt(v, w=8, d=4, na="n/a"):
     return f"{str(v):>{w}s}"
 
 
+def fmt_bold_if(v, is_best, w=8, d=4, na="n/a"):
+    """Like fmt but wraps the formatted value in **...** when is_best is true."""
+    s = fmt(v, w=w, d=d, na=na)
+    if is_best:
+        return f"**{s.strip()}**"
+    return s
+
+
+def per_col_mins(runs, keys):
+    """For each metric key, return the minimum value across the given runs.
+
+    None values are skipped. NaN is skipped (NaN != NaN). Returns a dict mapping
+    key -> the min value (or None if every value was missing).
+    """
+    out = {}
+    for k in keys:
+        vals = [r[k] for r in runs if r.get(k) is not None and r[k] == r[k]]
+        out[k] = min(vals) if vals else None
+    return out
+
+
+def top_performing_run(runs, metric_keys=("a_lin", "z_lin", "a_knn", "z_knn")):
+    """Identify the run that wins the most metric columns.
+
+    A "win" = strictly equals the per-column min. Ties on win-count are broken
+    by lowest a_knn. Returns the winning run_id (string) or None if `runs` is
+    empty.
+    """
+    if not runs:
+        return None
+    mins = per_col_mins(runs, metric_keys)
+    wins = {r["run_id"]: 0 for r in runs}
+    for k in metric_keys:
+        if mins[k] is None:
+            continue
+        for r in runs:
+            if r.get(k) is not None and r[k] == mins[k]:
+                wins[r["run_id"]] += 1
+    # Tie-break on a_knn ascending (lower = better).
+    ranked = sorted(
+        runs,
+        key=lambda r: (-wins[r["run_id"]], r["a_knn"] if r.get("a_knn") is not None else float("inf")),
+    )
+    return ranked[0]["run_id"]
+
+
 # ---- 1. RUN_INVENTORY.md -----------------------------------------------------
+
+METRIC_KEYS = ("a_lin", "z_lin", "a_knn", "z_knn")
+TOP_RUN_ID = top_performing_run(RUNS, METRIC_KEYS)
+GLOBAL_MINS = per_col_mins(RUNS, METRIC_KEYS)
+
+
+def bold_id(run_id):
+    """Bold the run_id if it's the top performer, else return as-is."""
+    return f"**{run_id}**" if run_id == TOP_RUN_ID else run_id
+
 
 with open(results_dir / "RUN_INVENTORY.md", "w", encoding="utf-8") as f:
     n_new = sum(1 for r in RUNS if r["source"].startswith("REFACTORED"))
@@ -151,6 +207,13 @@ with open(results_dir / "RUN_INVENTORY.md", "w", encoding="utf-8") as f:
     f.write("# Run Inventory\n\n")
     f.write(f"All training runs in the project: **{len(RUNS)} total** ({n_new} EMA new, {n_old} shared-encoder pre-refactor).\n\n")
     f.write("All MSE values are on z-scored targets (constant-mean baseline = 1.0; lower is better). N_train=700, N_val=96, N_test=104.\n\n")
+    f.write(
+        "**Bolding key.** Per-column **bold values** mark the best (lowest MSE) for that "
+        f"metric within the table. The bold **run_id** marks the top-performing model "
+        f"overall — defined as the run that wins the most of the four reported test "
+        f"metrics (a_lin, z_lin, a_kNN, z_kNN), with ties broken by lowest a_kNN. "
+        f"Currently: `{TOP_RUN_ID}`.\n\n"
+    )
     f.write("---\n\n")
 
     f.write("## Compact table — all runs sorted by alpha kNN test MSE\n\n")
@@ -158,22 +221,43 @@ with open(results_dir / "RUN_INVENTORY.md", "w", encoding="utf-8") as f:
     f.write("|---|---|---|---|---|---|---|---|---|---|---|\n")
     for r in sorted(RUNS, key=lambda x: x["a_knn"]):
         f.write(
-            f"| {r['run_id']} | {r['routing']} | {r['backbone']} | {r['target']} | {r['loss']} | "
-            f"{fmt(r['a_lin'])} | {fmt(r['z_lin'])} | {fmt(r['a_knn'])} | {fmt(r['z_knn'])} | "
+            f"| {bold_id(r['run_id'])} | {r['routing']} | {r['backbone']} | {r['target']} | {r['loss']} | "
+            f"{fmt_bold_if(r['a_lin'], r['a_lin'] == GLOBAL_MINS['a_lin'])} | "
+            f"{fmt_bold_if(r['z_lin'], r['z_lin'] == GLOBAL_MINS['z_lin'])} | "
+            f"{fmt_bold_if(r['a_knn'], r['a_knn'] == GLOBAL_MINS['a_knn'])} | "
+            f"{fmt_bold_if(r['z_knn'], r['z_knn'] == GLOBAL_MINS['z_knn'])} | "
             f"{fmt(r['wall_s'], w=6, d=0)} | {r['source']} |\n"
         )
     f.write("\n---\n\n")
 
     f.write("## Grouped by routing\n\n")
+    f.write(
+        "Per-column bolding here is **per routing** — each sub-table's best is bolded "
+        "within its own routing slice.\n\n"
+    )
     for routing in ["baseline", "exp_a", "exp_b"]:
+        routing_runs = [x for x in RUNS if x["routing"] == routing]
+        # Per-routing column mins. final_pred_mse intentionally excluded — it's
+        # the JEPA training loss and a lower value can mean collapse, not better
+        # representations (e.g. baseline_vicreg with pred_mse=0.0015 + zeta_kNN=1.98).
+        # Bolding the min there would visually reward collapse; don't.
+        routing_mins = per_col_mins(
+            routing_runs,
+            ("a_lin", "z_lin", "a_knn", "z_knn", "a_val_lin", "z_val_lin"),
+        )
         f.write(f"### {routing}\n\n")
         f.write("| backbone | target | loss | a_lin | z_lin | a_kNN | z_kNN | a val_lin | z val_lin | final_pmse |\n")
         f.write("|---|---|---|---|---|---|---|---|---|---|\n")
-        for r in sorted([x for x in RUNS if x["routing"] == routing], key=lambda x: x["a_knn"]):
+        for r in sorted(routing_runs, key=lambda x: x["a_knn"]):
             f.write(
                 f"| {r['backbone']} | {r['target']} | {r['loss']} | "
-                f"{fmt(r['a_lin'])} | {fmt(r['z_lin'])} | {fmt(r['a_knn'])} | {fmt(r['z_knn'])} | "
-                f"{fmt(r['a_val_lin'])} | {fmt(r['z_val_lin'])} | {fmt(r['final_pred_mse'])} |\n"
+                f"{fmt_bold_if(r['a_lin'],     r['a_lin']     == routing_mins['a_lin'])} | "
+                f"{fmt_bold_if(r['z_lin'],     r['z_lin']     == routing_mins['z_lin'])} | "
+                f"{fmt_bold_if(r['a_knn'],     r['a_knn']     == routing_mins['a_knn'])} | "
+                f"{fmt_bold_if(r['z_knn'],     r['z_knn']     == routing_mins['z_knn'])} | "
+                f"{fmt_bold_if(r['a_val_lin'], r['a_val_lin'] == routing_mins['a_val_lin'])} | "
+                f"{fmt_bold_if(r['z_val_lin'], r['z_val_lin'] == routing_mins['z_val_lin'])} | "
+                f"{fmt(r['final_pred_mse'])} |\n"
             )
         f.write("\n")
 
@@ -189,7 +273,7 @@ with open(results_dir / "RUN_INVENTORY.md", "w", encoding="utf-8") as f:
     for r in sorted(RUNS, key=lambda x: x["run_id"]):
         amp = "False" if r["backbone"] == "cnn" else "True"
         f.write(
-            f"| {r['run_id']} | {fmt(r['lambda'], w=6, d=3)} | "
+            f"| {bold_id(r['run_id'])} | {fmt(r['lambda'], w=6, d=3)} | "
             f"{fmt(r['vicreg_var_w'], w=6, d=1)} | {fmt(r['vicreg_cov_w'], w=6, d=1)} | "
             f"{fmt(r['ema_decay'], w=6, d=3)} | {amp} |\n"
         )

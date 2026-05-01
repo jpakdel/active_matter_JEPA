@@ -1,6 +1,8 @@
 # Ablation Effects: Per-Axis Decision Impact
 
-This document enumerates every paired comparison in the dataset where exactly one design axis is toggled and all others are held constant. Two sections: one for alpha (active dipole strength) and one for zeta (steric alignment). Each row in a table is a single ablation pair drawn from the project's 26 trained-and-evaluated cells (13 EMA cells in `runs/`, 13 shared-encoder cells in `../runs/`).
+This document enumerates every paired comparison in the dataset where exactly one design axis is toggled and all others are held constant. Two sections: one for alpha (active dipole strength) and one for zeta (steric alignment).
+
+> **⚠ Body tables reflect the 26-cell dataset as of 2026-04-29.** The 8 round-2 cells from 2026-04-30 (Phase 6 in `COMPLETED.md`) added new paired comparisons that are *not* yet incorporated into the per-axis tables below. The cross-table summary directly below has been updated for round-2; the detailed tables have not. To regenerate from scratch, extend `scripts/_gen_results_docs.py` to emit ABLATION_EFFECTS.md and re-port the summary section.
 
 Where a paired comparison doesn't exist (e.g. CNN+shared, no_cov+SIGReg, etc.), the row is omitted; the data simply doesn't cover that subspace.
 
@@ -22,11 +24,11 @@ Punch lines distilled across all 18 ablation tables below. Detailed evidence in 
 | VICReg cov_weight magnitude | slight effect on exp_b only | slight effect | also not sensitive |
 | Routing (baseline → exp_a → exp_b) | exp_a usually slightly worse; exp_b dramatically worse on alpha | exp_a roughly tied with baseline; exp_b also worse | the §6.1 "exp_b exposes alpha linearly" hypothesis is consistently refuted |
 
-**Three takeaways for design:**
+**Three takeaways for design (post-Phase-6):**
 
-1. **For alpha, the project leader is `baseline + cnn + ema + vicreg_no_cov`** (alpha kNN = 0.0131). Removing the cov term and switching to CNN both help on baseline; switching from shared to EMA target rescues an otherwise-collapsing VICReg run.
-2. **For zeta, the project leader is `baseline + vit + ema + vicreg`** (zeta kNN = 0.144). The ViT backbone and the cov-term-on VICReg are both winning choices for zeta.
-3. **No single configuration wins both targets.** Architecture × loss × target × routing all interact non-trivially. The cov term has the *cleanest* split: removing it is best for alpha on baseline, keeping it is best for zeta everywhere.
+1. **`baseline + vit + ema + vicreg_lam001` is the new project champion** (α-linear=0.0063, ζ-kNN=0.102, ζ-linear=0.068 — all #1; α-kNN=0.0147, narrow #2 to the CNN cell at 0.0131). The dethroning ablation: weakening VICReg's outer scale from λ=0.1 to λ=0.01 on the otherwise-best shared-encoder-rescue ViT-EMA-VICReg cell. The other 7 round-2 cells were structural perturbations of this recipe (route flip, target flip, cov toggle, varw, sigreg substitution); none beat it. The recipe is sharp: each of {routing=baseline, target=ema, loss=vicreg_lam001} is load-bearing — flipping any one degrades both probes by 7–14×.
+2. **The previous CNN-vs-ViT split survives only as a narrow α-kNN advantage for the CNN cell** (0.0131 vs 0.0147). On α-linear the ViT cell beats the CNN cell by 3× (0.0063 vs 0.0195) — the CNN cell's α-kNN edge does not generalize. ζ is uniformly ViT-favorable.
+3. **Mode-4 risk flag empirically validated** (round-2 cell 7, `exp_b+cnn+ema+vicreg_lam001`): exp_b routing makes α essentially unlearnable (α-kNN=0.475 vs 0.015 with baseline routing under otherwise-identical setup). The pre-registered structural prediction held.
 
 ---
 

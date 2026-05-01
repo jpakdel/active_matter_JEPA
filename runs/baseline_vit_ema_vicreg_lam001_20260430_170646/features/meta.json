@@ -1,0 +1,24 @@
+{
+  "checkpoint": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\baseline_vit_ema_vicreg_lam001_20260430_170646\\checkpoints\\ckpt_0010500.pt",
+  "config_path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\baseline_vit_ema_vicreg_lam001_20260430_170646\\config.json",
+  "global_step": 10500,
+  "epoch": 30,
+  "pool": "mean",
+  "embed_dim": 384,
+  "encoder_size": "small",
+  "context_channels": "all",
+  "splits": {
+    "train": {
+      "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\baseline_vit_ema_vicreg_lam001_20260430_170646\\features\\train.pt",
+      "N": 700
+    },
+    "val": {
+      "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\baseline_vit_ema_vicreg_lam001_20260430_170646\\features\\val.pt",
+      "N": 96
+    },
+    "test": {
+      "path": "C:\\Users\\Jubin\\DL_physics_2026\\REFACTORED_CODEBASE\\runs\\baseline_vit_ema_vicreg_lam001_20260430_170646\\features\\test.pt",
+      "N": 104
+    }
+  }
+}

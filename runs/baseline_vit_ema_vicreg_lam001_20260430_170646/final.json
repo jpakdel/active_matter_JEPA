@@ -1,0 +1,12 @@
+{
+  "wall_s": 2808.1159101999947,
+  "global_step": 10500,
+  "final_pred_mse": 0.28799867630004883,
+  "final_sigreg": 0.5171952247619629,
+  "final_total_loss": 0.29317063093185425,
+  "encoder_params": 23457408,
+  "predictor_params": 10943232,
+  "total_steps_planned": 10500,
+  "warmup_steps": 700,
+  "num_tokens": 2048
+}

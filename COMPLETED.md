@@ -96,13 +96,46 @@ In parallel, all analytical results were consolidated under `results/`:
 - [`results/README.md`](results/README.md) — index for the folder
 - [`results/PARETO.md`](results/PARETO.md) — top-5 by each of 4 metrics + Pareto frontier
 - [`results/ABLATION_EFFECTS.md`](results/ABLATION_EFFECTS.md) — paired comparisons for every design axis
-- [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md) — all 26 runs with all metrics + hyperparameters
+- [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md) — all runs with all metrics + hyperparameters
 - [`results/METRICS.md`](results/METRICS.md) — wall time, parameter counts, final losses
 - `results/_runs.json` — machine-readable raw inventory
 
 The generator at `scripts/_gen_results_docs.py` rebuilds the four data-driven docs from live run dirs. Re-run any time new training runs land.
 
-Final state: ~5,750 lines of source across 28 live modules; 26 trained-and-evaluated runs spanning the 4-axis design space (incomplete coverage — see "Coverage gaps" below).
+State at end of Phase 5: ~5,750 lines of source across 28 live modules; 26 trained-and-evaluated runs spanning the 4-axis design space.
+
+---
+
+## Phase 6 — Surrogate-driven round-2 sweep (2026-04-30)
+
+A `predict_configs.py` surrogate (random-forest over one-hot axis features, with per-tree variance for uncertainty + Hamming-distance-to-observed for extrapolation honesty) was fit on the 26-cell observation set. After fitting it produced a curated top-5 per metric (filtered for hamming=1, no Mode-3 collapse, no Mode-1-without-EMA-rescue). The deduped union — **8 cells** — was queued via `scripts/run_round2_recommended.sh` and ran to completion in **6h31m** (16:17 → 22:48 on 2026-04-30). All 8 cells finished without NaN or failure.
+
+| # | cell | α_lin | ζ_lin | α_kNN | ζ_kNN | note |
+|---|---|---|---|---|---|---|
+| 1 | baseline+vit+ema+vicreg_no_cov | 0.099 | 0.714 | 0.192 | 0.533 | unremarkable |
+| **2** | **baseline+vit+ema+vicreg_lam001** | **0.0063** ★ | **0.0680** ★ | 0.0147 | **0.1017** ★ | **new champion** |
+| 3 | baseline+vit+ema+sigreg_lam1 | 0.131 | 0.372 | 0.222 | 0.454 | unremarkable |
+| 4 | baseline+vit+ema+sigreg_lam001 | 0.209 | 0.327 | 0.173 | 0.404 | unremarkable |
+| 5 | baseline+vit+ema+vicreg_varw10 | 0.037 | 0.294 | 0.046 | 0.400 | top-3 on α; pred_mse=0.019 not collapse |
+| 6 | exp_a+vit+ema+vicreg_lam001 | 0.070 | 0.217 | 0.162 | 0.807 | routing flip from cell 2 → 8–11× worse |
+| 7 | exp_b+cnn+ema+vicreg_lam001 | 0.236 | 0.205 | 0.475 | 0.364 | M4 risk validated: exp_b makes α trivially predictable, encoder skips it |
+| 8 | exp_a+vit+shared+vicreg_lam001 | 0.090 | 0.255 | 0.202 | 0.670 | target flip from cell 2 → 7–14× worse |
+
+**Headline:** `baseline+vit+ema+vicreg_lam001` (cell 2) is the new project champion on three of four metrics. It loses α-kNN to the previous winner `baseline+cnn+ema+vicreg_no_cov` (0.0131) by 0.0016 — within probe noise — but wins α-linear by **3×** (0.0063 vs 0.0195), so its features actually contain α more cleanly; the kNN gap is just whether the 10 nearest neighbors happen to land tightly. On ζ it improves on the prior best by 29% (kNN) and 49% (linear).
+
+**Each of cell 2's three loaded axes is necessary**:
+
+- Routing flip (baseline → exp_a, cell 6) → α 11× worse, ζ 8× worse.
+- Target flip (ema → shared, cell 8) → α 14× worse, ζ 7× worse.
+- Loss-knob perturbations (cells 3, 4, 5) all underperform — `vicreg_lam001` (low outer λ on the regularizer) is genuinely the sweet spot, not interchangeable with sigreg or with other VICReg knob settings.
+
+**Mode-4 risk flag empirically validated** (cell 7): exp_b routing makes α essentially unlearnable (α_kNN = 0.475 vs 0.015 with baseline routing under otherwise-identical setup). The structural prediction from the analysis doc held.
+
+**Surrogate quality**: predictions were within 1σ for 6 of 8 cells. Cells 6 and 7 came in *worse* than predicted (the surrogate underestimated the routing penalty), and cell 2 came in **~14× better** on α than predicted. The latter is the value of running cells: the predicted-mean ranking would have buried cell 2 below several others.
+
+**One useful negative finding**: `final_pred_mse` (the JEPA training loss at end-of-training) is *not* a reliable proxy for probe quality. Cell 5 reached `pred_mse=0.019` (15× lower than cell 2's 0.288) but produced markedly worse probes than cell 2. A weak variance penalty (varw=10 vs default 25) lets the encoder drift toward easier-to-predict but less-informative representations without triggering full collapse.
+
+State at end of Phase 6: **34 trained-and-evaluated runs**.
 
 ---
 
@@ -126,7 +159,7 @@ These would be straightforward Tier-2 additions if more compute is available —
 | ViT-small | ~22.5M | ~10.9M | 46.9 min/run | fp16 |
 | CNN | ~3.8M | ~4.9M | 46.1 min/run | fp32 |
 
-Total compute: **20 ViT runs + 6 CNN runs ≈ 20.4 hours of GPU on a single RTX 4070 SUPER.**
+Total compute through Phase 6: **27 ViT runs + 7 CNN runs ≈ 26.7 hours of GPU on a single RTX 4070 SUPER.**
 
 Per-run record in `results/METRICS.md`.
 
@@ -134,9 +167,10 @@ Per-run record in `results/METRICS.md`.
 
 ## What's left
 
-- Final report writeup. The headline finding is the architecture × parameter interaction (CNN best for α, ViT best for ζ). Supporting axes-of-variation analysis is in `results/ABLATION_EFFECTS.md`. Recommended structure: methods → 4-axis design space → results table → ablation discussion → conclusion.
+- Final report writeup. After Phase 6, the headline shifted: a single ViT recipe (`baseline+vit+ema+vicreg_lam001`) now dominates 3 of 4 metrics; the prior "CNN-for-α / ViT-for-ζ" dichotomy survives only as a narrow α-kNN advantage for the CNN cell that doesn't reproduce on α-linear. Recommended report structure: methods → 4-axis design space → results table → ablation discussion → surrogate-driven round 2 → conclusion.
 - Optional: probe-over-training learning curves. Several individual runs (notably the 3-epoch Exp A short-checkpoint, α=0.085) hint that early-training representations may be different — and possibly better — than fully-converged ones for α probing. Deferred from the original plan as a §6.3 open item.
 - Optional: a CNN × shared (non-EMA) cell to isolate whether EMA is doing the work or whether CNN is doing it on its own. One cell, ~30 min.
+- Optional: re-run `predict_configs.py` against the now-34-cell dataset to seed a round-3 sweep. The Phase-6 surrogate had α-Spearman ρ=0.60 on 26 cells; with 34 cells it should be more informative still.
 
 ---
 

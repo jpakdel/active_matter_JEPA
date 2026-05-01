@@ -1,0 +1,10 @@
+cell                                        a_lin    z_lin    a_kNN    z_kNN   final_pmse
+--------------------------------------------------------------------------------------------
+baseline_vit_ema_vicreg_no_cov             0.0992   0.7140   0.1923   0.5331       0.9616
+baseline_vit_ema_vicreg_lam001             0.0063   0.0680   0.0147   0.1017       0.2880
+baseline_vit_ema_sigreg_lam1               0.1305   0.3718   0.2224   0.4537       0.9558
+baseline_vit_ema_sigreg_lam001             0.2090   0.3266   0.1732   0.4035       0.9160
+baseline_vit_ema_vicreg_varw10             0.0370   0.2943   0.0455   0.4004       0.0191
+exp_a_vit_ema_vicreg_lam001                0.0702   0.2174   0.1616   0.8070       0.0699
+exp_b_cnn_ema_vicreg_lam001                0.2362   0.2054   0.4753   0.3641       0.1455
+exp_a_vit_shared_vicreg_lam001             0.0900   0.2548   0.2016   0.6704       0.1771

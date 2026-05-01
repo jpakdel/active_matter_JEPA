@@ -10,18 +10,18 @@ The project's core question: **does any architectural / loss / target-encoder co
 
 ## Headline results
 
-After 26 trained-and-evaluated runs across a 4-axis design space, the project leaders are:
+After 34 trained-and-evaluated runs across a 4-axis design space, the project leaders are:
 
 | Metric | Best run | Test MSE (z-scored, lower=better) |
 |---|---|---|
 | **α kNN** | `baseline + cnn + ema + vicreg_no_cov` | **0.0131** |
-| **α linear** | same | **0.0195** |
-| **ζ kNN** | `baseline + vit + ema + vicreg` | **0.144** |
-| **ζ linear** | same | **0.133** |
+| **α linear** | `baseline + vit + ema + vicreg_lam001` | **0.0063** |
+| **ζ kNN** | `baseline + vit + ema + vicreg_lam001` | **0.102** |
+| **ζ linear** | `baseline + vit + ema + vicreg_lam001` | **0.068** |
 
-Two different best-of configurations for the two physical parameters: CNN dominates α, ViT dominates ζ. Same channel routing (`baseline`, all 11 channels into both encoder branches), same target-encoder type (EMA), same loss family (VICReg) — only **backbone** and **covariance term** differ. Full table: [`results/PARETO.md`](results/PARETO.md).
+`baseline + vit + ema + vicreg_lam001` (the round-2 surrogate-driven cell — see Phase 6 in [`COMPLETED.md`](COMPLETED.md)) sweeps three of the four metrics and ties on the fourth (α kNN, where it loses to the CNN cell by 0.0016). On α linear it is **3× better** than the CNN cell (0.0063 vs 0.0195), so the CNN cell's α-kNN edge does not generalize: cell 2's *features* contain α more cleanly. CNN keeps a narrow α-kNN advantage; for any other use, the ViT recipe wins. Full table: [`results/PARETO.md`](results/PARETO.md).
 
-For all 26 runs, every metric, every hyperparameter: [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
+For all 34 runs, every metric, every hyperparameter: [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
 
 ---
 
@@ -114,7 +114,7 @@ REFACTORED_CODEBASE/
 │   ├── README.md                 # index for this folder
 │   ├── PARETO.md                 # top-5 by each of 4 metrics + Pareto frontier
 │   ├── ABLATION_EFFECTS.md       # paired-comparison ablation tables for every design axis
-│   ├── RUN_INVENTORY.md          # all 26 runs with all metrics + hyperparameters
+│   ├── RUN_INVENTORY.md          # all 34 runs with all metrics + hyperparameters
 │   ├── METRICS.md                # wall time, parameter counts, final losses
 │   └── _runs.json                # machine-readable raw inventory
 │
@@ -143,7 +143,7 @@ Start with [`results/PARETO.md`](results/PARETO.md) for top-5s and the joint (α
 
 For per-axis design questions ("does adding the cov term help α on exp_a?"), see [`results/ABLATION_EFFECTS.md`](results/ABLATION_EFFECTS.md). It enumerates every paired comparison in the dataset where exactly one axis is toggled.
 
-For the full record (all 26 runs as one sortable table + per-routing breakouts + hyperparameters), see [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
+For the full record (all 34 runs as one sortable table + per-routing breakouts + hyperparameters), see [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
 
 For training metadata (wall time, parameter counts, compute accounting), see [`results/METRICS.md`](results/METRICS.md).
 

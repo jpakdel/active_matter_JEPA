@@ -1,0 +1,65 @@
+{
+  "seed": 0,
+  "data": {
+    "data_dir": "../data/active_matter",
+    "num_frames": 16,
+    "stride": null,
+    "noise_std": 0.0,
+    "context_channels": "D",
+    "target_channels": "u"
+  },
+  "train": {
+    "target_type": "ema",
+    "ema_decay": 0.996
+  },
+  "optim": {
+    "batch_size": 2,
+    "num_workers": 4,
+    "num_epochs": 30,
+    "lr": 0.0003,
+    "start_lr": 1e-06,
+    "final_lr": 1e-06,
+    "warmup_epochs": 2,
+    "weight_decay": 0.05,
+    "final_weight_decay": 0.4,
+    "wd_exclude_bias_and_norm": true,
+    "grad_clip": 1.0,
+    "use_amp": true,
+    "compile": false
+  },
+  "log": {
+    "out_dir": "runs",
+    "log_every_steps": 10,
+    "val_every_epochs": 1,
+    "save_every_steps": 500,
+    "keep_last_n_ckpts": 3
+  },
+  "experiment": "exp_a",
+  "run_name": "exp_a_v0",
+  "model": {
+    "backbone": "vit",
+    "encoder_size": "small",
+    "encoder": {
+      "img_size": 256,
+      "patch_size": 16,
+      "num_frames": 16,
+      "tubelet_size": 2,
+      "mlp_ratio": 4.0,
+      "drop_rate": 0.0,
+      "attn_drop_rate": 0.0,
+      "uniform_power": false
+    },
+    "predictor": {
+      "predictor_embed_dim": 384,
+      "depth": 6,
+      "num_heads": 6,
+      "mlp_ratio": 4.0
+    }
+  },
+  "loss": {
+    "reg_type": "vicreg",
+    "lambda_sigreg": 0.01,
+    "vicreg_var_weight": 25.0,
+    "vicreg_cov_weight": 1.0
+  }
+}

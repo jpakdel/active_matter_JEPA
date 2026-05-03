@@ -12,6 +12,14 @@ The project trains across a 4-axis design space — routing × backbone × targe
 
 After 34 trained-and-evaluated runs, the project champion is `baseline + vit + ema + vicreg_lam001`:
 
+<p align="center">
+  <img src="visualizations/outputs/pca3d_baseline_alpha.gif"
+       alt="Top-3 PCs of the champion encoder's test-set features, colored by α — α-color separates cleanly along one direction"
+       width="500">
+  <br>
+  <em>Top-3 PCs of the champion encoder's test-set features, colored by α. The color gradient along one direction is the geometric form of what the linear probe is fitting (α-linear MSE = 0.0063). Full set of figures: <a href="visualizations/outputs/">visualizations/outputs/</a>.</em>
+</p>
+
 | Metric | Test MSE (z-scored, lower=better) |
 |---|---|
 | α linear probe | **0.0063** |

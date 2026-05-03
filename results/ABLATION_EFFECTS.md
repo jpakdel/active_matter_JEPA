@@ -16,7 +16,7 @@ Punch lines distilled across all 18 ablation tables below. Detailed evidence in 
 |---|---|---|---|
 | Backbone (ViT → CNN) | **mixed**: hurts on baseline (+0.26), helps on exp_b (-0.34) | **hurts** on baseline (+0.61), helps on exp_b (-0.58) | architecture × routing interaction is real |
 | Target (shared → EMA) | mostly **helps**, with one giant rescue (+VICReg+baseline: -0.70) | mostly **helps**, giant rescue same place (-1.84) | EMA mainly matters where the loss alone collapses |
-| Loss family (SIGReg → VICReg) | **routing-dependent**: helps baseline+exp_a, hurts exp_b | same direction as alpha | exp_b is structurally hostile to VICReg in any form tested |
+| Loss family (SIGReg → VICReg) | **routing-dependent**: helps baseline+exp_a, hurts exp_b | same direction as alpha | every exp_b cell with VICReg in this dataset underperformed its SIGReg twin |
 | VICReg cov term (off → on) | **routing-dependent**: hurts baseline (+0.33), helps exp_a (-0.19), helps exp_b on CNN (-0.13) but hurts on ViT (+0.11) | **helps** across the board (-0.20 to -0.32) | cov off is best for alpha on baseline; cov on is best for zeta everywhere |
 | SIGReg lambda (0.1 default) | both stronger and weaker hurt alpha | weaker (0.01) helps zeta (+ collapses) | tuning doesn't rescue exp_b under SIGReg |
 | VICReg lambda (outer) | weaker (0.01) helps alpha on exp_b (-0.16) | weaker (0.01) helps zeta on exp_b dramatically (-1.30) | weakening the regularizer is a real lever |
@@ -26,9 +26,9 @@ Punch lines distilled across all 18 ablation tables below. Detailed evidence in 
 
 **Three takeaways for design (post-Phase-6):**
 
-1. **`baseline + vit + ema + vicreg_lam001` is the new project champion** (α-linear=0.0063, ζ-kNN=0.102, ζ-linear=0.068 — all #1; α-kNN=0.0147, narrow #2 to the CNN cell at 0.0131). The dethroning ablation: weakening VICReg's outer scale from λ=0.1 to λ=0.01 on the otherwise-best shared-encoder-rescue ViT-EMA-VICReg cell. The other 7 round-2 cells were structural perturbations of this recipe (route flip, target flip, cov toggle, varw, sigreg substitution); none beat it. The recipe is sharp: each of {routing=baseline, target=ema, loss=vicreg_lam001} is load-bearing — flipping any one degrades both probes by 7–14×.
+1. **`baseline + vit + ema + vicreg_lam001` is the new project champion** (α-linear=0.0063, ζ-kNN=0.102, ζ-linear=0.068 — all #1; α-kNN=0.0147, narrow #2 to the CNN cell at 0.0131). The dethroning ablation: weakening VICReg's outer scale from λ=0.1 to λ=0.01 on the otherwise-best ViT-EMA-VICReg cell. The other 7 round-2 cells were structural perturbations of this recipe (route flip, target flip, cov toggle, varw, sigreg substitution); none beat it. Within the round-2 batch, two axes are cleanly ablated from cell 2: routing (cell 2 vs 6 — α 11× worse, ζ 8× worse) and loss (cells 3, 4, 5 — α 3–15× worse). The target axis is *not* directly ablated at cell 2's recipe (cell 8 differs in both routing and target); the cell-6-vs-cell-8 target-only flip (both `exp_a+vit+vicreg_lam001`) shows target=shared is 25% worse on α-kNN but 17% better on ζ-kNN.
 2. **The previous CNN-vs-ViT split survives only as a narrow α-kNN advantage for the CNN cell** (0.0131 vs 0.0147). On α-linear the ViT cell beats the CNN cell by 3× (0.0063 vs 0.0195) — the CNN cell's α-kNN edge does not generalize. ζ is uniformly ViT-favorable.
-3. **Mode-4 risk flag empirically validated** (round-2 cell 7, `exp_b+cnn+ema+vicreg_lam001`): exp_b routing makes α essentially unlearnable (α-kNN=0.475 vs 0.015 with baseline routing under otherwise-identical setup). The pre-registered structural prediction held.
+3. **The exp_b cell `exp_b+cnn+ema+vicreg_lam001` underperforms its baseline-routing twin** by 30× on α-kNN (0.475 vs 0.015). This is one paired comparison; see [`RUN_INVENTORY.md`](RUN_INVENTORY.md) for the full per-routing range across all 34 cells.
 
 ---
 

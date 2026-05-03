@@ -1,0 +1,4 @@
+routing	run_id	N	D	participation_ratio	n_95_variance
+baseline	baseline_vit_ema_vicreg_lam001_20260430_170646	104	384	10.017342047413344	47
+exp_a	exp_a_vit_ema_vicreg_lam001_20260430_202310	104	384	17.684590318080883	62
+exp_b	exp_b_vit_ema_vicreg_20260428_142657	104	384	28.52024178248168	47

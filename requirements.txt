@@ -1,15 +1,8 @@
-# Install GPU PyTorch separately per your CUDA version (see pytorch.org).
+# Install GPU PyTorch separately per your CUDA version (https://pytorch.org).
 # Then: pip install -r requirements.txt
 torch
-einops
-h5py
 numpy
-omegaconf
-hydra-core
-tqdm
-scikit-image
-scikit-learn
-the_well
-timm
-wandb
+h5py
+pyyaml
 matplotlib
+scikit-learn

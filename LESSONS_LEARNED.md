@@ -4,9 +4,9 @@ A running log of non-obvious bugs, infrastructure surprises, and other places
 the project lost time. Each entry: **symptom → root cause → fix → lesson**.
 Most recent at the top. Add new entries as they happen — the value compounds.
 
-For physics / scientific bugs (the axis-convention bug, the 3-epoch α
-artifact), see `../STOKES_TEST.md` and `../project_plan.md` §6 instead — those
-are part of the science narrative. This file is for engineering pitfalls.
+For purely scientific observations (the 3-epoch α artifact, etc.) see
+`../project_plan.md` §6 instead. Convention bugs, infra bugs, and anything
+that's a pitfall for a future implementer go here.
 
 ---
 
@@ -264,6 +264,50 @@ Applied in `scripts/run_all_ablations.sh` and `scripts/run_cells_6_7.sh`.
 **Lesson.** **No Unicode in `print()` calls in this repo until cp1252 is dealt with at startup.** Constants and docstrings are fine (they're not encoded by default until printed). The project-wide rule is: prints stay ASCII. If you want symbols in user-facing reports, encode them in returned strings or markdown, not stdout.
 
 **Cost incurred.** ~5 minutes plus one re-run of the test.
+
+---
+
+## 2026-04-19 — `derived_fields.py` axis convention silently flipped one component of `∇·D`
+
+**Symptom.** First run of the multi-metric Stokes diagnostic (`scripts/stokes_validation/stokes_correlation_analysis.py`) produced per-component Pearson `r(Δu_i, -∇·D_i)` whose signs *disagreed* across the two vector components:
+
+```
+alpha     r (i=1)     r (i=2)
+ -2.0      0.49       -0.73
+ -3.0      0.55       -0.73
+ -4.0      0.47       -0.69
+```
+
+The Stokes equation is index-symmetric, so a sign mismatch on components is not physics. OLS slopes on i=2 alone landed near α (`α=-4 → slope=-2.89`) while i=1 gave the wrong sign — i=2 was correct, i=1 was flipped.
+
+**Root cause.** Standard image arrays use `(H, W) = (rows, cols) = (y, x)`, so axis -2 is y and axis -1 is x. I wrote `derived_fields.py` to that convention. But The Well stores its HDF5 spatial axes in `(x, y)` order:
+
+```
+root attr spatial_dims=['x' 'y']
+t2_fields/D:  shape=(3, 81, 256, 256, 2, 2)   # (sample, t, x, y, i, j)
+```
+
+`WellDatasetForJEPA` does no axis swap, so the tensor coming out as `(C, T, H, W)` has axis -2 = x and axis -1 = y — the *opposite* of the image convention. So my `_d_dx` (axis -1) was actually computing `∂/∂y` and `_d_dy` (axis -2) was computing `∂/∂x`. Since `D` is symmetric, the swap didn't cancel inside `(div D)_i` — it flipped i=1 while leaving i=2 intact.
+
+The analytical unit tests *passed* through this bug because the test built its meshgrid with `torch.meshgrid(y, x, indexing='ij')` — matching the *image* convention I had coded to. The unit tests weren't testing the convention used by the real dataset.
+
+**Fix.** Swap the axis assignments and document explicitly. In [`src/data/derived_fields.py`](src/data/derived_fields.py):
+
+- `_d_dx` operates on axis -2, `_d_dy` on axis -1.
+- `_laplacian_2d` signature reordered to `(f, hx, hy)`.
+- `divergence_D` / `laplacian_u` take `spacing=(hx, hy)` (was `(hy, hx)`).
+- Module docstring documents the convention: `(..., H, W) = (..., x, y); axis -2 is x, axis -1 is y`.
+- Unit-test meshgrid in [`scripts/stokes_validation/sanity_check_derived_fields.py`](scripts/stokes_validation/sanity_check_derived_fields.py) flipped to `torch.meshgrid(x, y, indexing='ij')` so it tests the dataset's actual convention.
+
+After the fix, per-component Pearson signs agreed and curl correlations hit -1.00 — see [`../STOKES_TEST.md`](../STOKES_TEST.md).
+
+**Lesson.** Three things compound here:
+
+1. **Vendored datasets often use non-image axis conventions.** Don't assume `(H, W) = (y, x)` just because that's what matplotlib expects. Check the dataset's documented axis order — for HDF5 datasets, the file's `spatial_dims` attribute is authoritative.
+2. **Analytical unit tests don't catch convention bugs if the test uses the same convention as the buggy code.** A unit test with `meshgrid(y, x)` against a kernel coded for `(y, x)` axes passes regardless of what the real data uses. **Cross-check kernels against real data, not just synthetic inputs.**
+3. **Run a battery of metrics, not one summary number.** Single-Pearson would have looked weak-but-not-obviously-buggy on this. The component asymmetry was the smoking gun — and only a per-component metric exposed it. **Component-asymmetric outputs from index-symmetric physics is a convention-bug signature.**
+
+**Cost incurred.** ~30 minutes of "is the physics actually weak?" before noticing the asymmetry. Caught before any downstream training so no compute wasted, but a buggy `divergence_D` would have silently corrupted every Experiment B run from then on.
 
 ---
 

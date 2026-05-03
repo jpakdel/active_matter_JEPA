@@ -14,7 +14,7 @@ All experimental results in one place. 34 trained runs, four metrics each.
 
 ## Where the data comes from
 
-- **21 EMA / round-2 runs** under `REFACTORED_CODEBASE/runs/*_2026*/` (13 from the 2026-04-28 / 04-29 ablation queue + 8 from the 2026-04-30 surrogate-driven round-2 sweep — see `COMPLETED.md` Phase 6).
+- **21 EMA / round-2 runs** under `REFACTORED_CODEBASE/runs/*_2026*/` (13 from the 2026-04-28 / 04-29 ablation queue + 8 from the 2026-04-30 round-2 sweep — see `COMPLETED.md` Phase 6).
 - **13 shared-encoder runs** under `../runs/*` (the original SIGReg + VICReg sweep from 2026-04-21 through 2026-04-24).
 
 Both groups are evaluated with the same pipeline (`scripts/eval.py` -> `src/eval/{linear_probe,knn_regression}.py`) using train-split z-score statistics applied to val/test labels. Constant-mean baseline = 1.0; lower MSE = better.

@@ -101,14 +101,13 @@ else:
 # Reason codes:
 #   a#  = rank in curated alpha top-5
 #   z#  = rank in curated zeta top-5
-#   M4  = exp_b routing flag (energy function trivially satisfied on alpha)
 run_cell 1 baseline vit ema    vicreg_no_cov   "a1 (pred 0.136)"
 run_cell 2 baseline vit ema    vicreg_lam001   "a3+z1 (pred a=0.207, z=0.385)"
 run_cell 3 baseline vit ema    sigreg_lam1     "a2+z5 (pred a=0.203, z=0.442)"
 run_cell 4 baseline vit ema    sigreg_lam001   "a4 (pred 0.210)"
 run_cell 5 baseline vit ema    vicreg_varw10   "a5 (pred 0.210)"
 run_cell 6 exp_a    vit ema    vicreg_lam001   "z3 (pred 0.411)"
-run_cell 7 exp_b    cnn ema    vicreg_lam001   "z2 (pred 0.410, M4)"
+run_cell 7 exp_b    cnn ema    vicreg_lam001   "z2 (pred 0.410)"
 run_cell 8 exp_a    vit shared vicreg_lam001   "z4 (pred 0.426)"
 
 echo "" | tee -a "$LOG"

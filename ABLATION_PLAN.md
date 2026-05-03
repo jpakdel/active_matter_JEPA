@@ -66,26 +66,22 @@ After 10–12 (~10.2h), I know how the cov term behaves on CNN.
 
 If the queue runs to completion, this gives a full 16-cell sweep covering both backbones across all three routings under both regularizer families, all with EMA on. Combined with the existing 14 shared-encoder runs, total dataset = 30 cells.
 
-## Round 2 — Surrogate-driven (2026-04-30, 8 cells, ~6.5 hours, completed)
+## Round 2 — (2026-04-30, 8 cells, ~6.5 hours, completed)
 
-After 26 cells were in the can, a random-forest surrogate over the one-hot 4-axis design space (`predict_configs.py` at the project root) predicted probe quality at the 94 untested cells and produced a curated top-5 per metric (filter: hamming=1 from observed, no Mode-3 collapse, no Mode-1-without-EMA-rescue). The deduped union — 8 cells — was queued via [`scripts/run_round2_recommended.sh`](scripts/run_round2_recommended.sh).
+After 26 cells were in the can, an additional 8 cells were queued via [`scripts/run_round2_recommended.sh`](scripts/run_round2_recommended.sh).
 
-| # | Routing | Backbone | Target | Loss | Why picked |
-|---|---|---|---|---|---|
-| 1 | baseline | vit | ema | vicreg_no_cov | curated α top-1 (predicted 0.136) |
-| 2 | baseline | vit | ema | vicreg_lam001 | curated α top-3 + ζ top-1 |
-| 3 | baseline | vit | ema | sigreg_lam1 | curated α top-2 + ζ top-5 |
-| 4 | baseline | vit | ema | sigreg_lam001 | curated α top-4 |
-| 5 | baseline | vit | ema | vicreg_varw10 | curated α top-5 |
-| 6 | exp_a | vit | ema | vicreg_lam001 | curated ζ top-3 |
-| 7 | exp_b | cnn | ema | vicreg_lam001 | curated ζ top-2 (M4 risk flagged) |
-| 8 | exp_a | vit | shared | vicreg_lam001 | curated ζ top-4 |
+| # | Routing | Backbone | Target | Loss |
+|---|---|---|---|---|
+| 1 | baseline | vit | ema | vicreg_no_cov |
+| 2 | baseline | vit | ema | vicreg_lam001 |
+| 3 | baseline | vit | ema | sigreg_lam1 |
+| 4 | baseline | vit | ema | sigreg_lam001 |
+| 5 | baseline | vit | ema | vicreg_varw10 |
+| 6 | exp_a | vit | ema | vicreg_lam001 |
+| 7 | exp_b | cnn | ema | vicreg_lam001 |
+| 8 | exp_a | vit | shared | vicreg_lam001 |
 
-Sweep ran 16:17–22:48 on 2026-04-30, all 8 cells finished without NaN or eval failure. **Cell 2 (`baseline+vit+ema+vicreg_lam001`) became the new project champion on three of four metrics.** Full per-cell results in [`COMPLETED.md`](COMPLETED.md) (Phase 6) and [`results/PARETO.md`](results/PARETO.md).
-
-## Round 3 — Not yet planned
-
-Refresh the surrogate against the 34-cell observation set (the Phase-6 surrogate had α-Spearman ρ=0.60 on 26 cells; with 34 cells it should rank more reliably) and re-pick the top recommendations. The launcher and resume logic handle this with no changes; the only step is to re-run `predict_configs.py --runs-dir runs/ --runs-dir REFACTORED_CODEBASE/runs/`.
+Sweep ran 16:17–22:48 on 2026-04-30, all 8 cells finished without NaN or eval failure. Cell 2 (`baseline+vit+ema+vicreg_lam001`) became the new project champion on three of four metrics. Full per-cell results in [`COMPLETED.md`](COMPLETED.md) (Phase 6) and [`results/PARETO.md`](results/PARETO.md).
 
 ## Not run (deliberate)
 

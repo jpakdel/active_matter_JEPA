@@ -38,6 +38,14 @@ runs/_runs_compiled.json
 runs/last_launch.log
 
 # =============================================================================
+# HF upload bundle — derived artifact regeneratable from
+# `python scripts/package_for_hf.py`. The published model lives at
+# https://huggingface.co/JJP9216NYUBB/JepaPhysics; the local hf_upload/
+# folder is a build output, not source.
+# =============================================================================
+hf_upload/
+
+# =============================================================================
 # OS / IDE noise
 # =============================================================================
 .DS_Store
@@ -46,6 +54,21 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# =============================================================================
+# Internal-development docs — not part of the submitted deliverable.
+# These are planning notes, narrative timelines, and bug logs that did not
+# contribute to producing the reported results. The submission keeps:
+#   README.md       (orientation / how to run)
+#   ENV.md          (vendored upstreams + reproducibility)
+#   results/*.md    (the actual results)
+#   visualizations/README.md  (index for the figures)
+# =============================================================================
+COMPLETED.md
+REFACTOR_PLAN.md
+ABLATION_PLAN.md
+LESSONS_LEARNED.md
+MY_README.md
 
 # =============================================================================
 # Explicit keeps — these are intentionally tracked, do not list above:

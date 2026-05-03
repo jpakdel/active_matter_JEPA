@@ -73,7 +73,7 @@ Most-significant result: **`baseline_vit_ema_vicreg`** rescued the original coll
 
 **CNN × EMA × {VICReg, vicreg_no_cov} × 3 routings = 6 cells.**
 
-Most-significant result: **`baseline_cnn_ema_vicreg_no_cov`** at α=0.0195 lin / **0.0131 kNN** — the project leader. The "no_cov" choice (variance-only VICReg, matching the teammate's exact recipe) is genuinely better than the cov-on variant for α on the baseline routing, because the cov term destroys a clean low-rank α direction when prediction is structurally easy.
+Most-significant result: **`baseline_cnn_ema_vicreg_no_cov`** at α=0.0195 lin / **0.0131 kNN** — the project leader at the time. The "no_cov" choice (variance-only VICReg, matching the teammate's exact recipe) outperformed the cov-on variant for α on the baseline routing in this set.
 
 The cov term turns out to be **routing-dependent**:
 
@@ -81,7 +81,7 @@ The cov term turns out to be **routing-dependent**:
 - exp_a (D → u, harder): cov ON is best (0.391 → 0.203)
 - exp_b (∇·D → Δu, hard): cov ON is best (0.541 → 0.410)
 
-When the prediction task is non-trivial and the encoder needs to spread information across many features, the decorrelation pressure helps. When prediction is easy, the encoder finds a clean low-rank α direction without any decorrelation push, and cov destroys it.
+In our cells, cov-on helped α on exp_a and on exp_b (CNN); cov-off was better on baseline.
 
 Detailed cross-axis analysis: [`results/ABLATION_EFFECTS.md`](results/ABLATION_EFFECTS.md).
 
@@ -106,36 +106,47 @@ State at end of Phase 5: ~5,750 lines of source across 28 live modules; 26 train
 
 ---
 
-## Phase 6 — Surrogate-driven round-2 sweep (2026-04-30)
+## Phase 6 — Round-2 sweep (2026-04-30)
 
-A `predict_configs.py` surrogate (random-forest over one-hot axis features, with per-tree variance for uncertainty + Hamming-distance-to-observed for extrapolation honesty) was fit on the 26-cell observation set. After fitting it produced a curated top-5 per metric (filtered for hamming=1, no Mode-3 collapse, no Mode-1-without-EMA-rescue). The deduped union — **8 cells** — was queued via `scripts/run_round2_recommended.sh` and ran to completion in **6h31m** (16:17 → 22:48 on 2026-04-30). All 8 cells finished without NaN or failure.
+A second batch of 8 cells was queued via `scripts/run_round2_recommended.sh` and ran to completion in 6h31m (16:17 → 22:48 on 2026-04-30). All 8 cells finished without NaN or failure.
 
-| # | cell | α_lin | ζ_lin | α_kNN | ζ_kNN | note |
-|---|---|---|---|---|---|---|
-| 1 | baseline+vit+ema+vicreg_no_cov | 0.099 | 0.714 | 0.192 | 0.533 | unremarkable |
-| **2** | **baseline+vit+ema+vicreg_lam001** | **0.0063** ★ | **0.0680** ★ | 0.0147 | **0.1017** ★ | **new champion** |
-| 3 | baseline+vit+ema+sigreg_lam1 | 0.131 | 0.372 | 0.222 | 0.454 | unremarkable |
-| 4 | baseline+vit+ema+sigreg_lam001 | 0.209 | 0.327 | 0.173 | 0.404 | unremarkable |
-| 5 | baseline+vit+ema+vicreg_varw10 | 0.037 | 0.294 | 0.046 | 0.400 | top-3 on α; pred_mse=0.019 not collapse |
-| 6 | exp_a+vit+ema+vicreg_lam001 | 0.070 | 0.217 | 0.162 | 0.807 | routing flip from cell 2 → 8–11× worse |
-| 7 | exp_b+cnn+ema+vicreg_lam001 | 0.236 | 0.205 | 0.475 | 0.364 | M4 risk validated: exp_b makes α trivially predictable, encoder skips it |
-| 8 | exp_a+vit+shared+vicreg_lam001 | 0.090 | 0.255 | 0.202 | 0.670 | target flip from cell 2 → 7–14× worse |
+| # | cell | α_lin | ζ_lin | α_kNN | ζ_kNN |
+|---|---|---|---|---|---|
+| 1 | baseline+vit+ema+vicreg_no_cov | 0.099 | 0.714 | 0.192 | 0.533 |
+| **2** | **baseline+vit+ema+vicreg_lam001** | **0.0063** ★ | **0.0680** ★ | 0.0147 | **0.1017** ★ |
+| 3 | baseline+vit+ema+sigreg_lam1 | 0.131 | 0.372 | 0.222 | 0.454 |
+| 4 | baseline+vit+ema+sigreg_lam001 | 0.209 | 0.327 | 0.173 | 0.404 |
+| 5 | baseline+vit+ema+vicreg_varw10 | 0.037 | 0.294 | 0.046 | 0.400 |
+| 6 | exp_a+vit+ema+vicreg_lam001 | 0.070 | 0.217 | 0.162 | 0.807 |
+| 7 | exp_b+cnn+ema+vicreg_lam001 | 0.236 | 0.205 | 0.475 | 0.364 |
+| 8 | exp_a+vit+shared+vicreg_lam001 | 0.090 | 0.255 | 0.202 | 0.670 |
 
-**Headline:** `baseline+vit+ema+vicreg_lam001` (cell 2) is the new project champion on three of four metrics. It loses α-kNN to the previous winner `baseline+cnn+ema+vicreg_no_cov` (0.0131) by 0.0016 — within probe noise — but wins α-linear by **3×** (0.0063 vs 0.0195), so its features actually contain α more cleanly; the kNN gap is just whether the 10 nearest neighbors happen to land tightly. On ζ it improves on the prior best by 29% (kNN) and 49% (linear).
+**Headline:** `baseline+vit+ema+vicreg_lam001` (cell 2) is the new project champion on three of four metrics. It loses α-kNN to `baseline+cnn+ema+vicreg_no_cov` (0.0131) by 0.0016 but wins α-linear by 3× (0.0063 vs 0.0195). On ζ it improves on the prior best by 29% (kNN) and 49% (linear).
 
-**Each of cell 2's three loaded axes is necessary**:
+**Two of cell 2's axes are cleanly ablated within this batch**:
 
-- Routing flip (baseline → exp_a, cell 6) → α 11× worse, ζ 8× worse.
-- Target flip (ema → shared, cell 8) → α 14× worse, ζ 7× worse.
-- Loss-knob perturbations (cells 3, 4, 5) all underperform — `vicreg_lam001` (low outer λ on the regularizer) is genuinely the sweet spot, not interchangeable with sigreg or with other VICReg knob settings.
+- Routing flip (cell 2 vs cell 6, both `vit+ema+vicreg_lam001`, only routing differs) → α 11× worse, ζ 8× worse going baseline → exp_a
+- Loss perturbations (cells 3, 4, 5) all underperform cell 2 — α 3–15× worse, ζ 4–5× worse depending on the perturbation; `vicreg_lam001` is the sweet spot in this set
 
-**Mode-4 risk flag empirically validated** (cell 7): exp_b routing makes α essentially unlearnable (α_kNN = 0.475 vs 0.015 with baseline routing under otherwise-identical setup). The structural prediction from the analysis doc held.
+The target axis is **not** cleanly ablated from cell 2 within this batch: cell 8 differs from cell 2 in both routing and target. The closest target-only flip in the dataset is cell 6 vs cell 8 (both `exp_a+vit+vicreg_lam001`): target=shared is 25% worse on α-kNN (0.202 vs 0.162) but 17% better on ζ-kNN (0.670 vs 0.807). Separately, the `baseline+vit+vicreg` recipe (without `lam001`) shows target=shared → ema is a 13× α-linear improvement, so the target axis is load-bearing on at least one related recipe.
 
-**Surrogate quality**: predictions were within 1σ for 6 of 8 cells. Cells 6 and 7 came in *worse* than predicted (the surrogate underestimated the routing penalty), and cell 2 came in **~14× better** on α than predicted. The latter is the value of running cells: the predicted-mean ranking would have buried cell 2 below several others.
-
-**One useful negative finding**: `final_pred_mse` (the JEPA training loss at end-of-training) is *not* a reliable proxy for probe quality. Cell 5 reached `pred_mse=0.019` (15× lower than cell 2's 0.288) but produced markedly worse probes than cell 2. A weak variance penalty (varw=10 vs default 25) lets the encoder drift toward easier-to-predict but less-informative representations without triggering full collapse.
+**Negative finding**: `final_pred_mse` (the JEPA training loss at end-of-training) is not a reliable proxy for probe quality. Cell 5 reached `pred_mse=0.019` (15× lower than cell 2's 0.288) but produced markedly worse probes than cell 2.
 
 State at end of Phase 6: **34 trained-and-evaluated runs**.
+
+---
+
+## Phase 7 — Visualization studies (2026-05-01)
+
+Built [`visualizations/`](visualizations/) — five self-contained scripts that produce paper / slide figures from the saved `runs/<id>/features/test.pt` tensors and the raw input fields. See [`visualizations/README.md`](visualizations/README.md) for the file index and [`visualizations/ANALYSIS.md`](visualizations/ANALYSIS.md) for the per-figure description and underlying numbers.
+
+A few measurable properties of the trained-encoder features for the chosen exp_b cell (`exp_b_vit_ema_vicreg_20260428_142657`) compared to the chosen baseline cell (`baseline_vit_ema_vicreg_lam001_20260430_170646`):
+
+- exp_b's test-feature singular values are ~1000× smaller in absolute magnitude than baseline's across the entire spectrum (see `outputs/feature_spectrum.png`).
+- Participation ratio: exp_b 28.5, baseline 10.0.
+- Top-3 PCs explain 21% of exp_b's variance, 48% of baseline's.
+
+These are descriptive of the two specific cells; they do not generalize to all exp_b runs. The full per-routing range of trained-cell numbers is in [`results/RUN_INVENTORY.md`](results/RUN_INVENTORY.md).
 
 ---
 
@@ -167,10 +178,9 @@ Per-run record in `results/METRICS.md`.
 
 ## What's left
 
-- Final report writeup. After Phase 6, the headline shifted: a single ViT recipe (`baseline+vit+ema+vicreg_lam001`) now dominates 3 of 4 metrics; the prior "CNN-for-α / ViT-for-ζ" dichotomy survives only as a narrow α-kNN advantage for the CNN cell that doesn't reproduce on α-linear. Recommended report structure: methods → 4-axis design space → results table → ablation discussion → surrogate-driven round 2 → conclusion.
+- Final report writeup. After Phase 6, the headline shifted: a single ViT recipe (`baseline+vit+ema+vicreg_lam001`) now dominates 3 of 4 metrics; the prior "CNN-for-α / ViT-for-ζ" dichotomy survives only as a narrow α-kNN advantage for the CNN cell that doesn't reproduce on α-linear. Recommended report structure: methods → 4-axis design space → results table → ablation discussion → conclusion.
 - Optional: probe-over-training learning curves. Several individual runs (notably the 3-epoch Exp A short-checkpoint, α=0.085) hint that early-training representations may be different — and possibly better — than fully-converged ones for α probing. Deferred from the original plan as a §6.3 open item.
 - Optional: a CNN × shared (non-EMA) cell to isolate whether EMA is doing the work or whether CNN is doing it on its own. One cell, ~30 min.
-- Optional: re-run `predict_configs.py` against the now-34-cell dataset to seed a round-3 sweep. The Phase-6 surrogate had α-Spearman ρ=0.60 on 26 cells; with 34 cells it should be more informative still.
 
 ---
 
@@ -179,7 +189,8 @@ Per-run record in `results/METRICS.md`.
 - [`README.md`](README.md) — project description, headline results, quick start
 - [`COMPLETED.md`](COMPLETED.md) — this file
 - [`REFACTOR_PLAN.md`](REFACTOR_PLAN.md) — design plan from the Phase-3 refactor
-- [`ABLATION_PLAN.md`](ABLATION_PLAN.md) — tier-1/tier-2 cell ordering for the Phase-4 queue
+- [`ABLATION_PLAN.md`](ABLATION_PLAN.md) — tier-1/tier-2 cell ordering for the Phase-4 queue + round-2 record
 - [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) — bug ledger from the development process (9 entries)
 - [`ENV.md`](ENV.md) — vendored upstream commits + dataset location
 - [`results/`](results/) — all analytical outputs, see `results/README.md`
+- [`visualizations/`](visualizations/) — paper / slide figures, see `visualizations/README.md`
